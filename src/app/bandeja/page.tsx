@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { areaEnum, tasks } from "@/db/schema";
 import { addDays, todayISO } from "@/lib/dates";
 import { discardTask, scheduleTask } from "../actions";
+import { TaskText } from "../task-text";
 
 type Area = (typeof areaEnum.enumValues)[number];
 type Props = { searchParams: Promise<{ area?: string }> };
@@ -71,7 +72,7 @@ async function Bandeja({ searchParams }: Props) {
         <ul className="flex flex-col">
           {items.map((t) => (
             <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover">
-              <span className="min-w-0 flex-1">{t.text}</span>
+              <TaskText id={t.id} text={t.text} time={t.time} />
               {t.area && <span className="rounded-md bg-hover px-1.5 py-0.5 text-xs capitalize text-muted">{t.area}</span>}
               <div className="flex items-center gap-1">
                 <form action={scheduleTask}>

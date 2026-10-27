@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { todayISO } from "@/lib/dates";
-import { parseCapture } from "@/lib/parse-capture";
+import { parseCapture, parseEdit } from "@/lib/parse-capture";
 
 // TODO(auth): verificar sesión aquí cuando exista el login con Google.
 
@@ -24,6 +24,20 @@ export async function captureTask(formData: FormData) {
 
   const { text, date, time } = parseCapture(input, todayISO());
   await db.insert(tasks).values({ text, date, time });
+  revalidate();
+}
+
+// Cambiar la fecha al editar es darle fecha a mano: el contador vuelve a cero.
+export async function editTask(id: number, input: string) {
+  if (!input.trim()) return;
+  const [task] = await db.select({ date: tasks.date }).from(tasks).where(eq(tasks.id, id));
+  if (!task) return;
+
+  const { text, date, time } = parseEdit(input, task.date, todayISO());
+  await db
+    .update(tasks)
+    .set({ text, date, time, ...(date !== task.date && { postponements: 0 }) })
+    .where(eq(tasks.id, id));
   revalidate();
 }
 

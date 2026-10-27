@@ -7,6 +7,7 @@ import { tasks } from "@/db/schema";
 import { addDays, formatDay, todayISO } from "@/lib/dates";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { Menu } from "./menu";
+import { TaskText } from "./task-text";
 import { captureTask, discardTask, postponeTask, scheduleTask, setTaskDone } from "./actions";
 
 type Props = { searchParams: Promise<{ fecha?: string }> };
@@ -84,7 +85,7 @@ async function Hoy({ searchParams }: Props) {
                       {done && "✓"}
                     </button>
                   </form>
-                  <span className={`flex-1 ${done ? "text-muted line-through" : ""}`}>{t.text}</span>
+                  <TaskText id={t.id} text={t.text} time={t.time} done={done} />
                   {t.postponements > 0 && (
                     <span
                       className={`rounded-md px-1.5 py-0.5 text-xs ${

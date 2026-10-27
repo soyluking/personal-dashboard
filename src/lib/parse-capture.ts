@@ -70,9 +70,7 @@ function parseDate(text: string, today: string) {
   return null;
 }
 
-// Reconoce fecha y hora con reglas simples. Sin fecha ni hora, la tarea va a la bandeja;
-// con hora y sin fecha, es para hoy.
-export function parseCapture(input: string, today: string): ParsedCapture {
+function extract(input: string, today: string) {
   let text = input;
   const d = parseDate(text, today);
   if (d) text = d.rest;
@@ -80,9 +78,19 @@ export function parseCapture(input: string, today: string): ParsedCapture {
   if (t) text = t.rest;
 
   const clean = text.replace(/\s+/g, " ").replace(/^[\s,.-]+|[\s,.-]+$/g, "");
-  return {
-    text: clean || input.trim(),
-    date: d?.date ?? (t ? today : null),
-    time: t?.time ?? null,
-  };
+  return { text: clean || input.trim(), date: d?.date ?? null, time: t?.time ?? null };
+}
+
+// Reconoce fecha y hora con reglas simples. Sin fecha ni hora, la tarea va a la bandeja;
+// con hora y sin fecha, es para hoy.
+export function parseCapture(input: string, today: string): ParsedCapture {
+  const { text, date, time } = extract(input, today);
+  return { text, date: date ?? (time ? today : null), time };
+}
+
+// Al editar, la fecha se mantiene si no se escribe otra. La hora es la que quede
+// en el texto: borrarla deja la tarea sin hora.
+export function parseEdit(input: string, currentDate: string | null, today: string): ParsedCapture {
+  const { text, date, time } = extract(input, today);
+  return { text, date: date ?? currentDate ?? (time ? today : null), time };
 }
