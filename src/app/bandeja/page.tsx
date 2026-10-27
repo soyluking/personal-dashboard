@@ -57,7 +57,7 @@ async function Bandeja({ searchParams }: Props) {
   const action = "rounded-md border border-line px-2 py-1 text-xs text-muted transition-colors hover:border-line-strong hover:text-foreground";
 
   return (
-    <main className="mx-auto min-h-dvh max-w-3xl px-3 pb-24 pt-5 sm:px-6 sm:pt-8 md:pb-12">
+    <main className="mx-auto min-h-dvh max-w-3xl px-3 pb-12 pt-3 sm:px-6 md:pt-8">
       <h1 className="mb-4 text-2xl font-semibold tracking-tight sm:text-3xl">Bandeja</h1>
 
       <nav className="-mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-1">

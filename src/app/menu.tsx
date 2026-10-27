@@ -32,7 +32,7 @@ export function Menu({ label, children }: Props) {
       >
         ⋯
       </summary>
-      <div className="absolute right-0 top-8 z-10 flex w-52 flex-col rounded-xl border border-line bg-surface p-1 shadow-lg shadow-black/10">
+      <div className="glass absolute right-0 top-8 z-10 flex w-52 flex-col rounded-2xl p-1">
         {children}
       </div>
     </details>

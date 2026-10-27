@@ -38,22 +38,22 @@ async function Hoy({ searchParams }: Props) {
   const link = (iso: string) => (iso === today ? "/" : `/?fecha=${iso}`);
 
   const arrow =
-    "flex size-9 items-center justify-center rounded-full text-xl text-muted transition-colors hover:bg-hover hover:text-foreground";
+    "glass flex size-10 items-center justify-center rounded-full text-xl text-muted transition-colors hover:text-foreground";
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-5 sm:px-6 sm:pt-8">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pt-8">
         <header className="mb-6 flex flex-wrap items-center gap-2">
           <Link
             href="/"
             aria-disabled={day === today}
-            className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
-              day === today ? "pointer-events-none border-line text-muted" : "border-line-strong hover:bg-hover"
+            className={`glass flex h-10 items-center rounded-full px-4 text-sm transition-colors ${
+              day === today ? "pointer-events-none text-muted" : "hover:text-foreground"
             }`}
           >
             Hoy
           </Link>
-          <nav className="flex items-center">
+          <nav className="flex items-center gap-2">
             <Link href={link(addDays(day, -1))} aria-label="Día anterior" className={arrow}>
               ‹
             </Link>
@@ -61,7 +61,7 @@ async function Hoy({ searchParams }: Props) {
               ›
             </Link>
           </nav>
-          <h1 className="text-xl font-semibold capitalize tracking-tight sm:text-2xl">{formatDay(day)}</h1>
+          <h1 className="ml-1 text-xl font-medium capitalize tracking-tight sm:text-2xl">{formatDay(day)}</h1>
         </header>
 
         {items.length === 0 ? (
@@ -89,7 +89,7 @@ async function Hoy({ searchParams }: Props) {
                   {t.postponements > 0 && (
                     <span
                       className={`rounded-md px-1.5 py-0.5 text-xs ${
-                        t.postponements >= 3 ? "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300" : "bg-hover text-muted"
+                        t.postponements >= 3 ? "bg-amber-500/20 text-amber-300" : "bg-hover text-muted"
                       }`}
                     >
                       ↻ {t.postponements}
@@ -105,10 +105,9 @@ async function Hoy({ searchParams }: Props) {
         )}
       </main>
 
-      {/* En el celular queda sobre las pestañas de abajo (h-14). */}
-      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-background from-70% to-transparent px-3 pb-3 pt-8 sm:px-6 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 bg-gradient-to-t from-background/70 to-transparent px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 sm:px-6">
         <form action={captureTask} className="mx-auto max-w-3xl">
-          <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface py-2 pl-4 pr-2 shadow-lg shadow-black/5 focus-within:border-line-strong">
+          <div className="glass flex items-center gap-2 rounded-full py-2 pl-5 pr-2">
             <input
               name="text"
               autoFocus
@@ -116,14 +115,13 @@ async function Hoy({ searchParams }: Props) {
               placeholder="Anotar… (mañana 15:30, el lunes, 5/11)"
               className="min-w-0 flex-1 bg-transparent py-1.5 text-base outline-none placeholder:text-muted"
             />
-            <button aria-label="Agregar" className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-lg text-white transition-opacity hover:opacity-90">
+            <button aria-label="Agregar" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-white transition-opacity hover:opacity-90">
               ↑
             </button>
           </div>
           <p className="mt-1.5 text-center text-xs text-muted">Sin fecha ni hora va a la bandeja.</p>
         </form>
       </div>
-      <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden" />
     </div>
   );
 }

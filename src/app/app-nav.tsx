@@ -2,75 +2,116 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 type Props = { inbox: number };
 
+// Íconos de línea al estilo Gemini; heredan el color del texto.
+function Icon({ children }: { children: ReactNode }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="size-[22px] shrink-0">
+      {children}
+    </svg>
+  );
+}
+
 const SECTIONS = [
-  { href: "/", label: "Hoy", icon: "◉" },
-  { href: "/bandeja", label: "Bandeja", icon: "▤" },
+  {
+    href: "/",
+    label: "Hoy",
+    icon: (
+      <Icon>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+      </Icon>
+    ),
+  },
+  {
+    href: "/bandeja",
+    label: "Bandeja",
+    icon: (
+      <Icon>
+        <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+        <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+      </Icon>
+    ),
+  },
 ] as const;
 
-// En el computador, barra lateral colapsable; en el celular, pestañas abajo.
+const menuIcon = (
+  <Icon>
+    <path d="M4 9h16M4 15h16" />
+  </Icon>
+);
+
+const closeIcon = (
+  <Icon>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Icon>
+);
+
+// Como Gemini: en el computador, barra lateral colapsable; en el celular, menú lateral a pantalla completa.
 export function AppNav({ inbox }: Props) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const count = (href: string) => (href === "/bandeja" && inbox > 0 ? inbox : null);
+
+  const links = (compact: boolean, onNavigate?: () => void) =>
+    SECTIONS.map(({ href, label, icon }) => {
+      const active = pathname === href;
+      return (
+        <Link
+          key={href}
+          href={href}
+          onClick={onNavigate}
+          title={compact ? label : undefined}
+          className={`flex h-12 items-center gap-4 rounded-full px-3 text-base transition-colors ${
+            active ? "bg-white/10 font-medium text-foreground" : "text-muted hover:bg-hover hover:text-foreground"
+          }`}
+        >
+          {icon}
+          {!compact && <span className="flex-1">{label}</span>}
+          {!compact && count(href) && <span className="text-sm tabular-nums text-muted">{count(href)}</span>}
+        </Link>
+      );
+    });
 
   return (
     <>
       <aside
-        className={`sticky top-0 hidden h-dvh shrink-0 flex-col gap-1 border-r border-line px-3 py-4 transition-[width] md:flex ${
-          collapsed ? "w-16" : "w-60"
+        className={`sticky top-0 hidden h-dvh shrink-0 flex-col gap-1 px-3 py-4 transition-[width] md:flex ${
+          collapsed ? "w-[4.5rem]" : "w-64 bg-sidebar"
         }`}
       >
         <button
           onClick={() => setCollapsed(!collapsed)}
           aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
-          className="mb-3 flex size-10 items-center justify-center rounded-full text-lg text-muted transition-colors hover:bg-hover hover:text-foreground"
+          className="mb-3 flex size-12 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-foreground"
         >
-          ☰
+          {menuIcon}
         </button>
-        {SECTIONS.map(({ href, label, icon }) => {
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={`flex h-10 items-center gap-3 rounded-full px-3 text-sm transition-colors ${
-                active ? "bg-accent/15 font-medium text-foreground" : "text-muted hover:bg-hover hover:text-foreground"
-              }`}
-            >
-              <span className="w-4 text-center">{icon}</span>
-              {!collapsed && <span className="flex-1">{label}</span>}
-              {!collapsed && count(href) && <span className="text-xs tabular-nums text-muted">{count(href)}</span>}
-            </Link>
-          );
-        })}
+        {links(collapsed)}
       </aside>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
-        {SECTIONS.map(({ href, label, icon }) => {
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs ${
-                active ? "font-medium text-accent" : "text-muted"
-              }`}
-            >
-              <span className="text-base leading-none">{icon}</span>
-              <span>
-                {label}
-                {count(href) && ` (${count(href)})`}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+      <header className="sticky top-0 z-20 px-3 pt-3 md:hidden">
+        <button onClick={() => setOpen(true)} aria-label="Abrir menú" className="glass flex size-12 items-center justify-center rounded-full">
+          {menuIcon}
+        </button>
+      </header>
+
+      {open && (
+        <div className="fixed inset-0 z-40 flex flex-col gap-1 bg-sidebar px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:hidden">
+          <div className="mb-4 flex items-center justify-between pl-3">
+            <span className="text-2xl font-medium">Dashboard</span>
+            <button onClick={() => setOpen(false)} aria-label="Cerrar menú" className="flex size-12 items-center justify-center rounded-full bg-white/10">
+              {closeIcon}
+            </button>
+          </div>
+          {links(false, () => setOpen(false))}
+        </div>
+      )}
     </>
   );
 }
