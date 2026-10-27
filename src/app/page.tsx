@@ -5,7 +5,9 @@ import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { addDays, formatDay, todayISO } from "@/lib/dates";
-import { captureTask, setTaskDone } from "./actions";
+import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
+import { Menu } from "./menu";
+import { captureTask, discardTask, postponeTask, scheduleTask, setTaskDone } from "./actions";
 
 type Props = { searchParams: Promise<{ fecha?: string }> };
 
@@ -24,6 +26,8 @@ async function Hoy({ searchParams }: Props) {
   const today = todayISO();
   const day = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : today;
 
+  await rollOverOverdue(today);
+
   const items = await db
     .select()
     .from(tasks)
@@ -33,28 +37,30 @@ async function Hoy({ searchParams }: Props) {
   const link = (iso: string) => (iso === today ? "/" : `/?fecha=${iso}`);
 
   const arrow =
-    "flex size-9 items-center justify-center rounded-lg text-lg text-muted transition-colors hover:bg-hover hover:text-foreground";
+    "flex size-9 items-center justify-center rounded-full text-xl text-muted transition-colors hover:bg-hover hover:text-foreground";
 
   return (
-    <>
-      <main className="mx-auto min-h-dvh max-w-3xl px-3 pb-36 pt-5 sm:px-6 sm:pt-10">
-        <header className="mb-6 flex items-center justify-between gap-2">
-          <div>
-            <h1 className="text-2xl font-semibold capitalize tracking-tight sm:text-3xl">{formatDay(day)}</h1>
-            {day !== today && (
-              <Link href="/" className="text-sm text-muted underline-offset-2 hover:underline">
-                Volver a hoy
-              </Link>
-            )}
-          </div>
-          <nav className="flex gap-1">
+    <div className="flex min-h-dvh flex-col">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-5 sm:px-6 sm:pt-8">
+        <header className="mb-6 flex flex-wrap items-center gap-2">
+          <Link
+            href="/"
+            aria-disabled={day === today}
+            className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+              day === today ? "pointer-events-none border-line text-muted" : "border-line-strong hover:bg-hover"
+            }`}
+          >
+            Hoy
+          </Link>
+          <nav className="flex items-center">
             <Link href={link(addDays(day, -1))} aria-label="Día anterior" className={arrow}>
-              ←
+              ‹
             </Link>
             <Link href={link(addDays(day, 1))} aria-label="Día siguiente" className={arrow}>
-              →
+              ›
             </Link>
           </nav>
+          <h1 className="text-xl font-semibold capitalize tracking-tight sm:text-2xl">{formatDay(day)}</h1>
         </header>
 
         {items.length === 0 ? (
@@ -63,8 +69,9 @@ async function Hoy({ searchParams }: Props) {
           <ul className="flex flex-col">
             {items.map((t) => {
               const done = t.status === "hecha";
+              const mustDecide = !done && t.postponements >= DECISION_THRESHOLD;
               return (
-                <li key={t.id} className="flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover">
+                <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover">
                   <form action={setTaskDone}>
                     <input type="hidden" name="id" value={t.id} />
                     <input type="hidden" name="done" value={String(!done)} />
@@ -88,6 +95,8 @@ async function Hoy({ searchParams }: Props) {
                     </span>
                   )}
                   {t.time && <span className="text-sm tabular-nums text-muted">{t.time.slice(0, 5)}</span>}
+                  {!done && !mustDecide && <TaskMenu id={t.id} nextLabel={day === today ? "Pasar a mañana" : "Pasar al día siguiente"} />}
+                  {mustDecide && <Decision id={t.id} />}
                 </li>
               );
             })}
@@ -95,7 +104,8 @@ async function Hoy({ searchParams }: Props) {
         )}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-background from-70% to-transparent px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 sm:px-6">
+      {/* En el celular queda sobre las pestañas de abajo (h-14). */}
+      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-background from-70% to-transparent px-3 pb-3 pt-8 sm:px-6 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <form action={captureTask} className="mx-auto max-w-3xl">
           <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface py-2 pl-4 pr-2 shadow-lg shadow-black/5 focus-within:border-line-strong">
             <input
@@ -112,6 +122,57 @@ async function Hoy({ searchParams }: Props) {
           <p className="mt-1.5 text-center text-xs text-muted">Sin fecha ni hora va a la bandeja.</p>
         </form>
       </div>
-    </>
+      <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))] md:hidden" />
+    </div>
+  );
+}
+
+const menuItem = "w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-hover";
+
+// Acciones de una tarea, con nombre escrito para no adivinar íconos.
+function TaskMenu({ id, nextLabel }: { id: number; nextLabel: string }) {
+  return (
+    <Menu label="Más acciones">
+      <form action={postponeTask}>
+        <input type="hidden" name="id" value={id} />
+        <button className={menuItem}>{nextLabel}</button>
+      </form>
+      <form action={scheduleTask} className="flex items-center gap-1 px-2 py-1">
+        <input type="hidden" name="id" value={id} />
+        <input type="date" name="date" required aria-label="Nueva fecha" className="min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-1 text-xs" />
+        <button className="rounded-md px-2 py-1 text-sm hover:bg-hover">Mover</button>
+      </form>
+      <form action={scheduleTask}>
+        <input type="hidden" name="id" value={id} />
+        <button className={menuItem}>Mandar a la bandeja</button>
+      </form>
+      <form action={discardTask}>
+        <input type="hidden" name="id" value={id} />
+        <button className={`${menuItem} text-muted`}>Descartar</button>
+      </form>
+    </Menu>
+  );
+}
+
+// Desde la tercera postergación: hacerla (el check), darle fecha, devolverla a la bandeja o descartarla.
+function Decision({ id }: { id: number }) {
+  const button = "rounded-md border border-line px-2 py-1 text-xs transition-colors hover:border-line-strong";
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2 pl-8 text-muted">
+      <span className="text-xs">¿Qué hacemos?</span>
+      <form action={scheduleTask} className="flex items-center gap-1">
+        <input type="hidden" name="id" value={id} />
+        <input type="date" name="date" required aria-label="Nueva fecha" className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs" />
+        <button className={button}>Darle fecha</button>
+      </form>
+      <form action={scheduleTask}>
+        <input type="hidden" name="id" value={id} />
+        <button className={button}>A la bandeja</button>
+      </form>
+      <form action={discardTask}>
+        <input type="hidden" name="id" value={id} />
+        <button className={button}>Descartar</button>
+      </form>
+    </div>
   );
 }

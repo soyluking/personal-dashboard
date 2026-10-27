@@ -42,3 +42,11 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* Tailwind 4 deja el cursor por defecto en los botones. */
+button:not(:disabled),
+summary,
+select,
+input[type="date"] {
+  cursor: pointer;
+}
