@@ -35,7 +35,7 @@ export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now:
     all.map((t) => (t.id === p.id ? { ...t, done: p.done } : t)),
   );
   const [, startTransition] = useTransition();
-  // Tareas recién marcadas que aún no bajan a «Hechas»: dan tiempo a la animación.
+  // Tareas recién marcadas que aún no bajan a «Completadas»: dan tiempo a la animación.
   const [waiting, setWaiting] = useState<Set<number>>(new Set());
   const [burst, setBurst] = useState<number | null>(null);
   const [confetti, setConfetti] = useState<{ left: number; delay: number; color: string; spin: number }[] | null>(null);
@@ -152,7 +152,7 @@ export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now:
               className="flex w-full items-center gap-1.5 px-2 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-muted transition-colors hover:text-foreground"
             >
               <span aria-hidden className={`transition-transform ${showDone ? "rotate-90" : ""}`}>›</span>
-              Hechas ({finished.length})
+              Completadas ({finished.length})
             </button>
           </li>
         )}
@@ -178,7 +178,7 @@ function Check({ done, burst, onToggle }: { done: boolean; burst: boolean; onTog
     <button
       type="button"
       onClick={onToggle}
-      aria-label={done ? "Marcar pendiente" : "Marcar hecha"}
+      aria-label={done ? "Marcar pendiente" : "Marcar completada"}
       className={`check relative flex size-6 shrink-0 items-center justify-center rounded-md border transition-[background-color,border-color,transform] duration-200 active:scale-90 ${
         done ? "check-done border-accent bg-accent" : "border-line-strong hover:border-accent"
       }`}
@@ -217,7 +217,7 @@ function Progress({ done, total }: { done: number; total: number }) {
         />
       </svg>
       <p className="text-sm text-muted">
-        <span className="font-medium tabular-nums text-foreground">{done}</span> de {total} hechas
+        <span className="font-medium tabular-nums text-foreground">{done}</span> de {total} completadas
         {all && " · ¡Día completo!"}
       </p>
     </div>

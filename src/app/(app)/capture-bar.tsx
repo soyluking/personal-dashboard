@@ -3,7 +3,7 @@ import { captureTask } from "./actions";
 // `day` es el día de la vista: lo que se anota sin fecha queda ahí. Sin `day` (bandeja), queda sin fecha.
 export function CaptureBar({ day, hint }: { day?: string; hint: string }) {
   return (
-    <div className="sticky bottom-0 bg-gradient-to-t from-background/70 to-transparent px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 sm:px-6">
+    <div className="sticky bottom-0 bg-gradient-to-t from-background/70 to-transparent px-5 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.5rem))] pt-8 sm:px-6">
       <form action={captureTask} className="mx-auto max-w-3xl">
         <input type="hidden" name="day" value={day ?? ""} />
         <div className="glass flex items-center gap-2 rounded-full py-2 pl-5 pr-2">
