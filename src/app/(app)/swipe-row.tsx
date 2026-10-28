@@ -94,7 +94,7 @@ export function SwipeRow({ enabled, onComplete, onPostpone, onDiscard, children 
   return (
     <div
       ref={ref}
-      className="relative overflow-x-clip rounded-lg"
+      className="relative rounded-lg has-[details[open]]:z-20"
       style={{ touchAction: enabled ? "pan-y" : undefined }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
