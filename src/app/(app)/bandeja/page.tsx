@@ -5,6 +5,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { areaEnum, tasks } from "@/db/schema";
 import { addDays, todayISO } from "@/lib/dates";
+import { verifySession } from "@/lib/session";
 import { discardTask, scheduleTask } from "../actions";
 import { TaskText } from "../task-text";
 
@@ -22,6 +23,7 @@ export default function BandejaPage({ searchParams }: Props) {
 }
 
 async function Bandeja({ searchParams }: Props) {
+  await verifySession();
   await connection();
   const { area } = await searchParams;
   const today = todayISO();

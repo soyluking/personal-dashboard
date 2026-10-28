@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { logout } from "./actions";
 
 type Props = { inbox: number };
 
@@ -50,6 +51,12 @@ const closeIcon = (
   </Icon>
 );
 
+const logoutIcon = (
+  <Icon>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+  </Icon>
+);
+
 // Como Gemini: en el computador, barra lateral colapsable; en el celular, menú lateral a pantalla completa.
 export function AppNav({ inbox }: Props) {
   const pathname = usePathname();
@@ -78,6 +85,18 @@ export function AppNav({ inbox }: Props) {
       );
     });
 
+  const logoutButton = (compact: boolean) => (
+    <form action={logout} className="mt-auto">
+      <button
+        title={compact ? "Cerrar sesión" : undefined}
+        className="flex h-12 w-full items-center gap-4 rounded-full px-3 text-base text-muted transition-colors hover:bg-hover hover:text-foreground"
+      >
+        {logoutIcon}
+        {!compact && <span>Cerrar sesión</span>}
+      </button>
+    </form>
+  );
+
   return (
     <>
       <aside
@@ -93,6 +112,7 @@ export function AppNav({ inbox }: Props) {
           {menuIcon}
         </button>
         {links(collapsed)}
+        {logoutButton(collapsed)}
       </aside>
 
       <header className="sticky top-0 z-20 px-3 pt-3 md:hidden">
@@ -110,6 +130,7 @@ export function AppNav({ inbox }: Props) {
             </button>
           </div>
           {links(false, () => setOpen(false))}
+          {logoutButton(false)}
         </div>
       )}
     </>

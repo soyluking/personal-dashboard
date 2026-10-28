@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
-import { countInbox } from "@/lib/tasks";
-import { AppNav } from "./app-nav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,15 +24,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col md:flex-row">
-        <Suspense fallback={<AppNav inbox={0} />}>
-          <Nav />
-        </Suspense>
-        <div className="min-w-0 flex-1">{children}</div>
+        {children}
       </body>
     </html>
   );
-}
-
-async function Nav() {
-  return <AppNav inbox={await countInbox()} />;
 }

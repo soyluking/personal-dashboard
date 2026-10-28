@@ -2,12 +2,12 @@
 
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { signOut } from "@/auth";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { todayISO } from "@/lib/dates";
 import { parseCapture, parseEdit } from "@/lib/parse-capture";
-
-// TODO(auth): verificar sesión aquí cuando exista el login con Google.
+import { verifySession } from "@/lib/session";
 
 function revalidate() {
   revalidatePath("/");
@@ -19,6 +19,7 @@ function taskId(formData: FormData) {
 }
 
 export async function captureTask(formData: FormData) {
+  await verifySession();
   const input = String(formData.get("text") ?? "").trim();
   if (!input) return;
 
@@ -29,6 +30,7 @@ export async function captureTask(formData: FormData) {
 
 // Cambiar la fecha al editar es darle fecha a mano: el contador vuelve a cero.
 export async function editTask(id: number, input: string) {
+  await verifySession();
   if (!input.trim()) return;
   const [task] = await db.select({ date: tasks.date }).from(tasks).where(eq(tasks.id, id));
   if (!task) return;
@@ -42,6 +44,7 @@ export async function editTask(id: number, input: string) {
 }
 
 export async function setTaskDone(formData: FormData) {
+  await verifySession();
   const done = formData.get("done") === "true";
   await db
     .update(tasks)
@@ -52,6 +55,7 @@ export async function setTaskDone(formData: FormData) {
 
 // Pasa la tarea al día siguiente de su fecha y suma una postergación.
 export async function postponeTask(formData: FormData) {
+  await verifySession();
   await db
     .update(tasks)
     .set({
@@ -65,6 +69,7 @@ export async function postponeTask(formData: FormData) {
 // Darle fecha es un compromiso nuevo: el contador vuelve a cero.
 // Sin fecha, la tarea vuelve a la bandeja.
 export async function scheduleTask(formData: FormData) {
+  await verifySession();
   const date = String(formData.get("date") ?? "");
   await db
     .update(tasks)
@@ -77,9 +82,14 @@ export async function scheduleTask(formData: FormData) {
 }
 
 export async function discardTask(formData: FormData) {
+  await verifySession();
   await db
     .update(tasks)
     .set({ status: "descartada" })
     .where(eq(tasks.id, taskId(formData)));
   revalidate();
+}
+
+export async function logout() {
+  await signOut({ redirectTo: "/login" });
 }

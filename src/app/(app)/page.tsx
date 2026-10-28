@@ -5,6 +5,7 @@ import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { addDays, formatDay, todayISO } from "@/lib/dates";
+import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { Menu } from "./menu";
 import { TaskText } from "./task-text";
@@ -21,6 +22,7 @@ export default function HoyPage({ searchParams }: Props) {
 }
 
 async function Hoy({ searchParams }: Props) {
+  await verifySession();
   // La hora actual solo se puede leer en la solicitud, no al prerenderizar.
   await connection();
   const { fecha } = await searchParams;
