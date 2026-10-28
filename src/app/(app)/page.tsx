@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
-import { addDays, formatDay, todayISO } from "@/lib/dates";
+import { addDays, formatDay, formatDayShort, nowTime, todayISO } from "@/lib/dates";
 import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { Menu } from "./menu";
@@ -46,31 +46,30 @@ async function Hoy({ searchParams }: Props) {
   return (
     <div className="flex min-h-dvh flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pt-8">
-        <header className="mb-6 flex flex-wrap items-center gap-2">
-          <Link
-            href="/"
-            aria-disabled={day === today}
-            className={`glass flex h-10 items-center rounded-full px-4 text-sm transition-colors ${
-              day === today ? "pointer-events-none text-muted" : "hover:text-foreground"
-            }`}
-          >
-            Hoy
+        <header className="mb-6 flex min-h-12 items-center gap-2 pl-14 md:min-h-0 md:pl-0">
+          <Link href={link(addDays(day, -1))} aria-label="Día anterior" className={arrow}>
+            ‹
           </Link>
-          <nav className="flex items-center gap-2">
-            <Link href={link(addDays(day, -1))} aria-label="Día anterior" className={arrow}>
-              ‹
+          <h1 className="min-w-0 flex-1 truncate text-center text-lg font-medium capitalize tracking-tight sm:text-left sm:text-2xl">
+            <span className="sm:hidden">{formatDayShort(day)}</span>
+            <span className="hidden sm:inline">{formatDay(day)}</span>
+          </h1>
+          {day !== today && (
+            <Link href="/" className="glass flex h-10 items-center rounded-full px-4 text-sm transition-colors hover:text-foreground">
+              Hoy
             </Link>
-            <Link href={link(addDays(day, 1))} aria-label="Día siguiente" className={arrow}>
-              ›
-            </Link>
-          </nav>
-          <h1 className="ml-1 text-xl font-medium capitalize tracking-tight sm:text-2xl">{formatDay(day)}</h1>
+          )}
+          <Link href={link(addDays(day, 1))} aria-label="Día siguiente" className={arrow}>
+            ›
+          </Link>
         </header>
 
         {items.length === 0 ? (
           <p className="py-16 text-center text-muted">Nada para este día.</p>
         ) : (
           <TaskList
+            now={nowTime()}
+            trackOverdue={day === today}
             tasks={items.map((t) => {
               const done = t.status === "hecha";
               const mustDecide = !done && t.postponements >= DECISION_THRESHOLD;
@@ -91,7 +90,7 @@ async function Hoy({ searchParams }: Props) {
         )}
       </main>
 
-      <CaptureBar day={day} hint={day === today ? "Sin fecha, queda para hoy." : "Sin fecha, queda para este día."} />
+      <CaptureBar day={day} hint={day === today ? "queda para hoy" : "queda para este día"} />
     </div>
   );
 }

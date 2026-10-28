@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { nowTime } from "@/lib/dates";
 import { setTaskDone } from "./actions";
 import { TaskText } from "./task-text";
 
@@ -19,7 +20,17 @@ const SETTLE_MS = 700;
 const COLORS = ["#3f6fe6", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export function TaskList({ tasks }: { tasks: ListTask[] }) {
+// `now` es la hora del servidor («HH:MM»); solo hoy se marca lo vencido (`overdue` en falso para otros días).
+export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now: string; trackOverdue: boolean }) {
+  const [clock, setClock] = useState(now);
+  useEffect(() => {
+    if (!trackOverdue) return;
+    const tick = () => setClock(nowTime());
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [trackOverdue]);
+  const [showDone, setShowDone] = useState(false);
   const [optimistic, setOptimistic] = useOptimistic(tasks, (all, p: { id: number; done: boolean }) =>
     all.map((t) => (t.id === p.id ? { ...t, done: p.done } : t)),
   );
@@ -32,8 +43,9 @@ export function TaskList({ tasks }: { tasks: ListTask[] }) {
   const tops = useRef(new Map<number, number>());
 
   const orderKey = (t: ListTask) => t.done && !waiting.has(t.id);
-  const ordered = [...optimistic.filter((t) => !orderKey(t)), ...optimistic.filter(orderKey)];
-  const firstDone = ordered.findIndex(orderKey);
+  const pending = optimistic.filter((t) => !orderKey(t));
+  const finished = optimistic.filter(orderKey);
+  const ordered = [...pending, ...finished];
 
   const total = optimistic.length;
   const doneCount = optimistic.filter((t) => t.done).length;
@@ -94,34 +106,57 @@ export function TaskList({ tasks }: { tasks: ListTask[] }) {
     });
   };
 
+  const row = (t: ListTask) => {
+    const overdue = trackOverdue && !t.done && t.time !== null && t.time.slice(0, 5) < clock;
+    return (
+      <li key={t.id} ref={(el) => void (el ? rows.current.set(t.id, el) : rows.current.delete(t.id))}>
+        <div
+          className={`row-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover ${
+            overdue ? "bg-red-500/10" : ""
+          }`}
+        >
+          <Check done={t.done} burst={burst === t.id} onToggle={() => toggle(t)} />
+          <TaskText id={t.id} text={t.text} time={t.time} done={t.done} />
+          {t.postponements > 0 && (
+            <span
+              className={`rounded-md px-1.5 py-0.5 text-xs ${
+                t.postponements >= 3 ? "bg-amber-500/20 text-amber-300" : "bg-hover text-muted"
+              }`}
+            >
+              ↻ {t.postponements}
+            </span>
+          )}
+          {t.time && (
+            <span className={`text-sm tabular-nums ${overdue ? "font-medium text-red-400" : "text-muted"}`}>
+              {t.time.slice(0, 5)}
+              {overdue && <span className="sr-only"> (vencida)</span>}
+            </span>
+          )}
+          {!t.done && t.menu}
+        </div>
+      </li>
+    );
+  };
+
   return (
     <>
       {total > 0 && <Progress done={doneCount} total={total} />}
       <ul className="flex flex-col">
-        {ordered.map((t, i) => (
-          <li key={t.id} ref={(el) => void (el ? rows.current.set(t.id, el) : rows.current.delete(t.id))}>
-            {i === firstDone && (
-              <p className="px-2 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-muted">
-                Hechas · {optimistic.filter(orderKey).length}
-              </p>
-            )}
-            <div className="row-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover">
-              <Check done={t.done} burst={burst === t.id} onToggle={() => toggle(t)} />
-              <TaskText id={t.id} text={t.text} time={t.time} done={t.done} />
-              {t.postponements > 0 && (
-                <span
-                  className={`rounded-md px-1.5 py-0.5 text-xs ${
-                    t.postponements >= 3 ? "bg-amber-500/20 text-amber-300" : "bg-hover text-muted"
-                  }`}
-                >
-                  ↻ {t.postponements}
-                </span>
-              )}
-              {t.time && <span className="text-sm tabular-nums text-muted">{t.time.slice(0, 5)}</span>}
-              {!t.done && t.menu}
-            </div>
+        {pending.map(row)}
+        {finished.length > 0 && (
+          <li>
+            <button
+              type="button"
+              onClick={() => setShowDone(!showDone)}
+              aria-expanded={showDone}
+              className="flex w-full items-center gap-1.5 px-2 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-muted transition-colors hover:text-foreground"
+            >
+              <span aria-hidden className={`transition-transform ${showDone ? "rotate-90" : ""}`}>›</span>
+              Hechas ({finished.length})
+            </button>
           </li>
-        ))}
+        )}
+        {showDone && finished.map(row)}
       </ul>
       {confetti && (
         <div aria-hidden className="pointer-events-none fixed inset-0 z-50 overflow-hidden">

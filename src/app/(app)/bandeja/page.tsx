@@ -62,7 +62,7 @@ async function Bandeja({ searchParams }: Props) {
   return (
     <div className="flex min-h-dvh flex-col">
     <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pt-8">
-      <h1 className="mb-4 text-2xl font-semibold tracking-tight sm:text-3xl">Bandeja</h1>
+      <h1 className="mb-4 flex min-h-12 items-center pl-14 text-2xl md:min-h-0 md:pl-0 font-semibold tracking-tight sm:text-3xl">Bandeja</h1>
 
       <nav className="-mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-1">
         {chip(undefined, "Todas")}
@@ -106,7 +106,7 @@ async function Bandeja({ searchParams }: Props) {
         </ul>
       )}
     </main>
-    <CaptureBar hint="Se guarda sin fecha, en la bandeja." />
+    <CaptureBar hint="se guarda en la bandeja" />
     </div>
   );
 }

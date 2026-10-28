@@ -115,7 +115,7 @@ export function AppNav({ inbox }: Props) {
         {logoutButton(collapsed)}
       </aside>
 
-      <header className="sticky top-0 z-20 px-3 pt-3 md:hidden">
+      <header className="fixed left-3 top-3 z-20 md:hidden">
         <button onClick={() => setOpen(true)} aria-label="Abrir menú" className="glass flex size-12 items-center justify-center rounded-full">
           {menuIcon}
         </button>
