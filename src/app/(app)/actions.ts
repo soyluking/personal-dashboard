@@ -91,6 +91,21 @@ export async function discardTask(formData: FormData) {
   revalidate();
 }
 
+// Deshacer de postergar y descartar: devuelve la fecha y el contador que tenía y la deja pendiente.
+export async function restoreTask(formData: FormData) {
+  await verifySession();
+  const date = String(formData.get("date") ?? "");
+  await db
+    .update(tasks)
+    .set({
+      date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
+      postponements: Number(formData.get("postponements")) || 0,
+      status: "pendiente",
+    })
+    .where(eq(tasks.id, taskId(formData)));
+  revalidate();
+}
+
 export async function logout() {
   await signOut({ redirectTo: "/login" });
 }

@@ -69,6 +69,7 @@ async function Hoy({ searchParams }: Props) {
           <p className="py-16 text-center text-muted">Nada para este día.</p>
         ) : (
           <TaskList
+            day={day}
             now={nowTime()}
             trackOverdue={day === today}
             tasks={items.map((t) => {

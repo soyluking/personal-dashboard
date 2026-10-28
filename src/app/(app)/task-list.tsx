@@ -2,7 +2,8 @@
 
 import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { nowTime } from "@/lib/dates";
-import { setTaskDone } from "./actions";
+import { discardTask, postponeTask, restoreTask, setTaskDone } from "./actions";
+import { SwipeRow } from "./swipe-row";
 import { TaskText } from "./task-text";
 
 export type ListTask = {
@@ -21,7 +22,7 @@ const COLORS = ["#3f6fe6", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // `now` es la hora del servidor («HH:MM»); solo hoy se marca lo vencido (`overdue` en falso para otros días).
-export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now: string; trackOverdue: boolean }) {
+export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[]; day: string; now: string; trackOverdue: boolean }) {
   const [clock, setClock] = useState(now);
   useEffect(() => {
     if (!trackOverdue) return;
@@ -31,8 +32,8 @@ export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now:
     return () => clearInterval(id);
   }, [trackOverdue]);
   const [showDone, setShowDone] = useState(false);
-  const [optimistic, setOptimistic] = useOptimistic(tasks, (all, p: { id: number; done: boolean }) =>
-    all.map((t) => (t.id === p.id ? { ...t, done: p.done } : t)),
+  const [optimistic, setOptimistic] = useOptimistic(tasks, (all, p: { id: number; done?: boolean; remove?: boolean }) =>
+    p.remove ? all.filter((t) => t.id !== p.id) : all.map((t) => (t.id === p.id ? { ...t, done: p.done ?? t.done } : t)),
   );
   const [, startTransition] = useTransition();
   // Tareas recién marcadas que aún no bajan a «Completadas»: dan tiempo a la animación.
@@ -106,10 +107,54 @@ export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now:
     });
   };
 
+  // Aviso con «Deshacer» tras cada gesto: una tarea mal deslizada no se pierde.
+  const [toast, setToast] = useState<{ key: number; message: string; undo: () => void } | null>(null);
+  const toastKey = useRef(0);
+  const showToast = (message: string, undo: () => void) => setToast({ key: ++toastKey.current, message, undo });
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const leave = (t: ListTask, action: (data: FormData) => Promise<void>, message: string) => {
+    startTransition(async () => {
+      setOptimistic({ id: t.id, remove: true });
+      const data = new FormData();
+      data.set("id", String(t.id));
+      await action(data);
+    });
+    const undo = () => {
+      setToast(null);
+      startTransition(async () => {
+        const data = new FormData();
+        data.set("id", String(t.id));
+        data.set("date", day);
+        data.set("postponements", String(t.postponements));
+        await restoreTask(data);
+      });
+    };
+    showToast(message, undo);
+  };
+
+  const complete = (t: ListTask) => {
+    toggle(t);
+    showToast("Tarea completada", () => {
+      setToast(null);
+      toggle({ ...t, done: true });
+    });
+  };
+
   const row = (t: ListTask) => {
     const overdue = trackOverdue && !t.done && t.time !== null && t.time.slice(0, 5) < clock;
     return (
       <li key={t.id} ref={(el) => void (el ? rows.current.set(t.id, el) : rows.current.delete(t.id))}>
+        <SwipeRow
+          enabled={!t.done}
+          onComplete={() => complete(t)}
+          onPostpone={() => leave(t, postponeTask, "Tarea postergada")}
+          onDiscard={() => leave(t, discardTask, "Tarea descartada")}
+        >
         <div
           className={`row-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover ${
             overdue ? "bg-red-500/10" : ""
@@ -134,6 +179,7 @@ export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now:
           )}
           {!t.done && t.menu}
         </div>
+        </SwipeRow>
       </li>
     );
   };
@@ -158,6 +204,16 @@ export function TaskList({ tasks, now, trackOverdue }: { tasks: ListTask[]; now:
         )}
         {showDone && finished.map(row)}
       </ul>
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-30 flex justify-center px-5">
+          <div key={toast.key} role="status" className="glass row-in pointer-events-auto flex items-center gap-4 rounded-full py-2 pl-5 pr-2 text-sm">
+            {toast.message}
+            <button onClick={toast.undo} className="rounded-full bg-white/10 px-3 py-1.5 font-medium transition-transform active:scale-95">
+              Deshacer
+            </button>
+          </div>
+        </div>
+      )}
       {confetti && (
         <div aria-hidden className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
           {confetti.map((c, i) => (
