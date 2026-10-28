@@ -9,7 +9,8 @@ import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { Menu } from "./menu";
 import { TaskText } from "./task-text";
-import { captureTask, discardTask, postponeTask, scheduleTask, setTaskDone } from "./actions";
+import { CaptureBar } from "./capture-bar";
+import { discardTask, postponeTask, scheduleTask, setTaskDone } from "./actions";
 
 type Props = { searchParams: Promise<{ fecha?: string }> };
 
@@ -107,23 +108,7 @@ async function Hoy({ searchParams }: Props) {
         )}
       </main>
 
-      <div className="sticky bottom-0 bg-gradient-to-t from-background/70 to-transparent px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 sm:px-6">
-        <form action={captureTask} className="mx-auto max-w-3xl">
-          <div className="glass flex items-center gap-2 rounded-full py-2 pl-5 pr-2">
-            <input
-              name="text"
-              autoFocus
-              autoComplete="off"
-              placeholder="Anotar… (mañana 15:30, el lunes, 5/11)"
-              className="min-w-0 flex-1 bg-transparent py-1.5 text-base outline-none placeholder:text-muted"
-            />
-            <button aria-label="Agregar" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-white transition-opacity hover:opacity-90">
-              ↑
-            </button>
-          </div>
-          <p className="mt-1.5 text-center text-xs text-muted">Sin fecha ni hora va a la bandeja.</p>
-        </form>
-      </div>
+      <CaptureBar day={day} hint={day === today ? "Sin fecha, queda para hoy." : "Sin fecha, queda para este día."} />
     </div>
   );
 }

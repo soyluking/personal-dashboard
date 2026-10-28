@@ -81,11 +81,11 @@ function extract(input: string, today: string) {
   return { text: clean || input.trim(), date: d?.date ?? null, time: t?.time ?? null };
 }
 
-// Reconoce fecha y hora con reglas simples. Sin fecha ni hora, la tarea va a la bandeja;
-// con hora y sin fecha, es para hoy.
-export function parseCapture(input: string, today: string): ParsedCapture {
+// Reconoce fecha y hora con reglas simples. Sin fecha, la tarea queda en el día de la vista
+// (`viewDay`); sin vista (bandeja) queda sin fecha, salvo que tenga hora: entonces es para hoy.
+export function parseCapture(input: string, today: string, viewDay: string | null = null): ParsedCapture {
   const { text, date, time } = extract(input, today);
-  return { text, date: date ?? (time ? today : null), time };
+  return { text, date: date ?? viewDay ?? (time ? today : null), time };
 }
 
 // Al editar, la fecha se mantiene si no se escribe otra. La hora es la que quede

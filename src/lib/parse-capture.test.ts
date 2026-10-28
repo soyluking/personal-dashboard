@@ -9,6 +9,15 @@ describe("parseCapture", () => {
     expect(parseCapture("comprar pan", today)).toEqual({ text: "comprar pan", date: null, time: null });
   });
 
+  it("sin fecha queda en el día de la vista", () => {
+    expect(parseCapture("comprar pan", today, "2026-10-27")).toEqual({ text: "comprar pan", date: "2026-10-27", time: null });
+    expect(parseCapture("dentista 17:00", today, "2026-10-27").date).toBe("2026-10-27");
+  });
+
+  it("una fecha escrita gana sobre el día de la vista", () => {
+    expect(parseCapture("pagar el lunes", today, "2026-10-27").date).toBe("2026-11-02");
+  });
+
   it("mañana con hora", () => {
     expect(parseCapture("llamar al banco mañana 15:30", today)).toEqual({
       text: "llamar al banco",

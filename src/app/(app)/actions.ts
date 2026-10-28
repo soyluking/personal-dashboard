@@ -23,7 +23,8 @@ export async function captureTask(formData: FormData) {
   const input = String(formData.get("text") ?? "").trim();
   if (!input) return;
 
-  const { text, date, time } = parseCapture(input, todayISO());
+  const day = String(formData.get("day") ?? "");
+  const { text, date, time } = parseCapture(input, todayISO(), /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null);
   await db.insert(tasks).values({ text, date, time });
   revalidate();
 }

@@ -7,6 +7,7 @@ import { areaEnum, tasks } from "@/db/schema";
 import { addDays, todayISO } from "@/lib/dates";
 import { verifySession } from "@/lib/session";
 import { discardTask, scheduleTask } from "../actions";
+import { CaptureBar } from "../capture-bar";
 import { TaskText } from "../task-text";
 
 type Area = (typeof areaEnum.enumValues)[number];
@@ -59,7 +60,8 @@ async function Bandeja({ searchParams }: Props) {
   const action = "rounded-md border border-line px-2 py-1 text-xs text-muted transition-colors hover:border-line-strong hover:text-foreground";
 
   return (
-    <main className="mx-auto min-h-dvh max-w-3xl px-3 pb-12 pt-3 sm:px-6 md:pt-8">
+    <div className="flex min-h-dvh flex-col">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pt-8">
       <h1 className="mb-4 text-2xl font-semibold tracking-tight sm:text-3xl">Bandeja</h1>
 
       <nav className="-mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-1">
@@ -104,5 +106,7 @@ async function Bandeja({ searchParams }: Props) {
         </ul>
       )}
     </main>
+    <CaptureBar hint="Se guarda sin fecha, en la bandeja." />
+    </div>
   );
 }
