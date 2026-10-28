@@ -8,9 +8,9 @@ import { addDays, formatDay, todayISO } from "@/lib/dates";
 import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { Menu } from "./menu";
-import { TaskText } from "./task-text";
+import { TaskList } from "./task-list";
 import { CaptureBar } from "./capture-bar";
-import { discardTask, postponeTask, scheduleTask, setTaskDone } from "./actions";
+import { discardTask, postponeTask, scheduleTask } from "./actions";
 
 type Props = { searchParams: Promise<{ fecha?: string }> };
 
@@ -70,41 +70,24 @@ async function Hoy({ searchParams }: Props) {
         {items.length === 0 ? (
           <p className="py-16 text-center text-muted">Nada para este día.</p>
         ) : (
-          <ul className="flex flex-col">
-            {items.map((t) => {
+          <TaskList
+            tasks={items.map((t) => {
               const done = t.status === "hecha";
               const mustDecide = !done && t.postponements >= DECISION_THRESHOLD;
-              return (
-                <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover">
-                  <form action={setTaskDone}>
-                    <input type="hidden" name="id" value={t.id} />
-                    <input type="hidden" name="done" value={String(!done)} />
-                    <button
-                      aria-label={done ? "Marcar pendiente" : "Marcar hecha"}
-                      className={`flex size-5 items-center justify-center rounded-md border text-xs ${
-                        done ? "border-accent bg-accent text-white" : "border-line-strong hover:border-accent"
-                      }`}
-                    >
-                      {done && "✓"}
-                    </button>
-                  </form>
-                  <TaskText id={t.id} text={t.text} time={t.time} done={done} />
-                  {t.postponements > 0 && (
-                    <span
-                      className={`rounded-md px-1.5 py-0.5 text-xs ${
-                        t.postponements >= 3 ? "bg-amber-500/20 text-amber-300" : "bg-hover text-muted"
-                      }`}
-                    >
-                      ↻ {t.postponements}
-                    </span>
-                  )}
-                  {t.time && <span className="text-sm tabular-nums text-muted">{t.time.slice(0, 5)}</span>}
-                  {!done && !mustDecide && <TaskMenu id={t.id} nextLabel={day === today ? "Pasar a mañana" : "Pasar al día siguiente"} />}
-                  {mustDecide && <Decision id={t.id} />}
-                </li>
-              );
+              return {
+                id: t.id,
+                text: t.text,
+                time: t.time,
+                done,
+                postponements: t.postponements,
+                menu: mustDecide ? (
+                  <Decision id={t.id} />
+                ) : (
+                  <TaskMenu id={t.id} nextLabel={day === today ? "Pasar a mañana" : "Pasar al día siguiente"} />
+                ),
+              };
             })}
-          </ul>
+          />
         )}
       </main>
 
