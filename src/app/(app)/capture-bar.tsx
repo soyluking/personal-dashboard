@@ -14,7 +14,7 @@ export function CaptureBar({ day, hint }: { day?: string; hint: string }) {
             placeholder={`Anota algo… ${hint}`}
             className="min-w-0 flex-1 bg-transparent py-1.5 text-base outline-none placeholder:text-muted"
           />
-          <button aria-label="Agregar" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-white transition-opacity hover:opacity-90">
+          <button aria-label="Agregar" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-white transition-[opacity,transform] hover:opacity-90 active:scale-90">
             ↑
           </button>
         </div>

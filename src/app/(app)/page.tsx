@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
@@ -8,6 +7,8 @@ import { addDays, formatDay, formatDayShort, nowTime, todayISO } from "@/lib/dat
 import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { Menu } from "./menu";
+import { PressLink } from "./press-link";
+import { ListSkeleton } from "./skeleton";
 import { TaskList } from "./task-list";
 import { CaptureBar } from "./capture-bar";
 import { discardTask, postponeTask, scheduleTask } from "./actions";
@@ -16,7 +17,7 @@ type Props = { searchParams: Promise<{ fecha?: string }> };
 
 export default function HoyPage({ searchParams }: Props) {
   return (
-    <Suspense fallback={<main className="mx-auto min-h-dvh max-w-xl px-4 py-6" />}>
+    <Suspense fallback={<ListSkeleton />}>
       <Hoy searchParams={searchParams} />
     </Suspense>
   );
@@ -41,27 +42,27 @@ async function Hoy({ searchParams }: Props) {
   const link = (iso: string) => (iso === today ? "/" : `/?fecha=${iso}`);
 
   const arrow =
-    "glass flex size-10 items-center justify-center rounded-full text-xl text-muted transition-colors hover:text-foreground";
+    "glass flex size-10 items-center justify-center rounded-full text-xl text-muted hover:text-foreground";
 
   return (
     <div className="flex min-h-dvh flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pt-8">
         <header className="mb-6 flex min-h-12 items-center gap-2 pl-14 md:min-h-0 md:pl-0">
-          <Link href={link(addDays(day, -1))} aria-label="Día anterior" className={arrow}>
+          <PressLink href={link(addDays(day, -1))} aria-label="Día anterior" className={arrow}>
             ‹
-          </Link>
+          </PressLink>
           <h1 className="min-w-0 flex-1 truncate text-center text-lg font-medium capitalize tracking-tight sm:text-left sm:text-2xl">
             <span className="sm:hidden">{formatDayShort(day)}</span>
             <span className="hidden sm:inline">{formatDay(day)}</span>
           </h1>
           {day !== today && (
-            <Link href="/" className="glass flex h-10 items-center rounded-full px-4 text-sm transition-colors hover:text-foreground">
+            <PressLink href="/" className="glass flex h-10 items-center rounded-full px-4 text-sm hover:text-foreground">
               Hoy
-            </Link>
+            </PressLink>
           )}
-          <Link href={link(addDays(day, 1))} aria-label="Día siguiente" className={arrow}>
+          <PressLink href={link(addDays(day, 1))} aria-label="Día siguiente" className={arrow}>
             ›
-          </Link>
+          </PressLink>
         </header>
 
         {items.length === 0 ? (
@@ -95,7 +96,7 @@ async function Hoy({ searchParams }: Props) {
   );
 }
 
-const menuItem = "w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-hover";
+const menuItem = "w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-hover active:bg-line";
 
 // Acciones de una tarea, con nombre escrito para no adivinar íconos.
 function TaskMenu({ id, nextLabel }: { id: number; nextLabel: string }) {

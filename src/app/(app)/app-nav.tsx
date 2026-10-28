@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { logout } from "./actions";
+import { PressLink } from "./press-link";
 
 type Props = { inbox: number };
 
@@ -69,19 +69,19 @@ export function AppNav({ inbox }: Props) {
     SECTIONS.map(({ href, label, icon }) => {
       const active = pathname === href;
       return (
-        <Link
+        <PressLink
           key={href}
           href={href}
           onClick={onNavigate}
           title={compact ? label : undefined}
           className={`flex h-12 items-center gap-4 rounded-full px-3 text-base transition-colors ${
-            active ? "bg-white/10 font-medium text-foreground" : "text-muted hover:bg-hover hover:text-foreground"
+            active ? "bg-white/10 font-medium text-foreground" : "text-muted hover:bg-hover hover:text-foreground has-data-[pending=true]:bg-white/10 has-data-[pending=true]:text-foreground"
           }`}
         >
           {icon}
           {!compact && <span className="flex-1">{label}</span>}
           {!compact && count(href) && <span className="text-sm tabular-nums text-muted">{count(href)}</span>}
-        </Link>
+        </PressLink>
       );
     });
 
@@ -116,23 +116,27 @@ export function AppNav({ inbox }: Props) {
       </aside>
 
       <header className="fixed left-3 top-3 z-20 md:hidden">
-        <button onClick={() => setOpen(true)} aria-label="Abrir menú" className="glass flex size-12 items-center justify-center rounded-full">
+        <button onClick={() => setOpen(true)} aria-label="Abrir menú" className="glass flex size-12 items-center justify-center rounded-full transition-transform active:scale-90">
           {menuIcon}
         </button>
       </header>
 
-      {open && (
-        <div className="fixed inset-0 z-40 flex flex-col gap-1 bg-sidebar px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:hidden">
-          <div className="mb-4 flex items-center justify-between pl-3">
-            <span className="text-2xl font-medium">Dashboard</span>
-            <button onClick={() => setOpen(false)} aria-label="Cerrar menú" className="flex size-12 items-center justify-center rounded-full bg-white/10">
-              {closeIcon}
-            </button>
-          </div>
-          {links(false, () => setOpen(false))}
-          {logoutButton(false)}
+      <div
+        inert={!open}
+        aria-hidden={!open}
+        className={`fixed inset-0 z-40 flex flex-col gap-1 bg-sidebar px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none md:hidden ${
+          open ? "translate-x-0 opacity-100" : "-translate-x-full opacity-0"
+        }`}
+      >
+        <div className="mb-4 flex items-center justify-between pl-3">
+          <span className="text-2xl font-medium">Dashboard</span>
+          <button onClick={() => setOpen(false)} aria-label="Cerrar menú" className="flex size-12 items-center justify-center rounded-full bg-white/10 transition-transform active:scale-90">
+            {closeIcon}
+          </button>
         </div>
-      )}
+        {links(false, () => setOpen(false))}
+        {logoutButton(false)}
+      </div>
     </>
   );
 }

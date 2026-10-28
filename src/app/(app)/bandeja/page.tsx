@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
@@ -8,6 +7,8 @@ import { addDays, todayISO } from "@/lib/dates";
 import { verifySession } from "@/lib/session";
 import { discardTask, scheduleTask } from "../actions";
 import { CaptureBar } from "../capture-bar";
+import { PressLink } from "../press-link";
+import { ListSkeleton } from "../skeleton";
 import { TaskText } from "../task-text";
 
 type Area = (typeof areaEnum.enumValues)[number];
@@ -17,7 +18,7 @@ const NO_AREA = "sin-area";
 
 export default function BandejaPage({ searchParams }: Props) {
   return (
-    <Suspense fallback={<main className="mx-auto min-h-dvh max-w-xl px-4 py-6" />}>
+    <Suspense fallback={<ListSkeleton />}>
       <Bandeja searchParams={searchParams} />
     </Suspense>
   );
@@ -45,15 +46,15 @@ async function Bandeja({ searchParams }: Props) {
   const chip = (value: string | undefined, label: string) => {
     const active = value === area || (!value && !filter);
     return (
-      <Link
+      <PressLink
         key={label}
         href={value ? `/bandeja?area=${value}` : "/bandeja"}
-        className={`shrink-0 rounded-full border px-3 py-1 text-sm capitalize transition-colors ${
+        className={`shrink-0 rounded-full border px-3 py-1 text-sm capitalize ${
           active ? "border-accent bg-accent text-white" : "border-line text-muted hover:border-line-strong hover:text-foreground"
         }`}
       >
         {label}
-      </Link>
+      </PressLink>
     );
   };
 
