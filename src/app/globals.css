@@ -60,6 +60,28 @@ body::before {
     0 8px 32px rgb(0 0 0 / 0.4);
 }
 
+/* Barra superior fija y transparente. El difuminado vive en una capa detrás, más alta que la barra,
+   con máscara: se desvanece hacia abajo en vez de cortarse. */
+@utility topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 -2.75rem 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgb(11 11 13 / 0.4) 40%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-mask-image: linear-gradient(to bottom, black 45%, transparent);
+    mask-image: linear-gradient(to bottom, black 45%, transparent);
+  }
+}
+
 /* Tailwind 4 deja el cursor por defecto en los botones. */
 button:not(:disabled),
 summary,

@@ -62,8 +62,10 @@ async function Bandeja({ searchParams }: Props) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-    <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-3 sm:px-6 md:pt-8">
-      <h1 className="mb-4 flex min-h-12 items-center pl-14 text-2xl md:min-h-0 md:pl-0 font-semibold tracking-tight sm:text-3xl">Bandeja</h1>
+    <div className="topbar">
+      <h1 className="mx-auto flex h-16 w-full max-w-3xl items-center px-3 pl-[3.75rem] text-xl font-semibold leading-none tracking-tight sm:px-6 sm:pl-[3.75rem] sm:text-2xl md:h-20 md:pl-6">Bandeja</h1>
+    </div>
+    <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-4 sm:px-6">
 
       <nav className="-mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-1">
         {chip(undefined, "Todas")}

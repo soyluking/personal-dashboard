@@ -116,7 +116,7 @@ export function AppNav({ inbox }: Props) {
       </aside>
 
       <header className="fixed left-3 top-3 z-20 md:hidden">
-        <button onClick={() => setOpen(true)} aria-label="Abrir menú" className="glass flex size-12 items-center justify-center rounded-full transition-transform active:scale-90">
+        <button onClick={() => setOpen(true)} aria-label="Abrir menú" className="glass flex size-10 items-center justify-center rounded-full transition-transform active:scale-90">
           {menuIcon}
         </button>
       </header>
