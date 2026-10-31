@@ -41,3 +41,13 @@ export function formatDayShort(iso: string): string {
     .format(new Date(`${iso}T00:00:00Z`))
     .replace(/\./g, "");
 }
+
+// Días de `from` a `to` (negativo si `to` es antes).
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+// Día ISO: 1 = lunes … 7 = domingo.
+export function isoWeekday(iso: string): number {
+  return weekday(iso) || 7;
+}

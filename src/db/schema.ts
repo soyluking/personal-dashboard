@@ -32,12 +32,11 @@ export const taskStatusEnum = pgEnum("task_status", [
   "descartada",
 ]);
 
-export const routineKindEnum = pgEnum("routine_kind", ["habito", "compromiso"]);
+export const frequencyEnum = pgEnum("routine_frequency", ["diaria", "semanal"]);
 
-export const exceptionKindEnum = pgEnum("exception_kind", [
-  "otra_hora",
+export const routineExceptionKindEnum = pgEnum("routine_exception_kind", [
   "saltar",
-  "mover",
+  "cambiar",
 ]);
 
 export const tasks = pgTable(
@@ -58,48 +57,75 @@ export const tasks = pgTable(
   (t) => [index("tasks_date_idx").on(t.date)],
 );
 
-export const routineItems = pgTable("routine_items", {
+// La identidad de un elemento de rutina. Nombre, área y racha valen para toda su historia.
+export const routines = pgTable("routines", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  kind: routineKindEnum("kind").notNull(),
+  trackStreak: boolean("track_streak").notNull().default(true),
   area: areaEnum("area"),
-  time: time("time"),
-  // Días ISO: 1 = lunes … 7 = domingo.
-  weekdays: smallint("weekdays").array().notNull(),
-  // Semana por medio se cuenta desde esta fecha; null = cada semana.
-  biweeklyFrom: date("biweekly_from", { mode: "string" }),
-  // La edición vale desde esta fecha en adelante.
-  activeFrom: date("active_from", { mode: "string" }).notNull(),
-  archived: boolean("archived").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  // Archivar también cierra sus horarios; esto solo la saca de la lista.
+  archivedAt: date("archived_at", { mode: "string" }),
 });
 
+// Cuándo toca una rutina, con versiones: editar «desde un día» cierra el
+// horario vigente y abre otro, así el pasado se sigue calculando igual.
+export const routineSlots = pgTable(
+  "routine_slots",
+  {
+    id: serial("id").primaryKey(),
+    routineId: integer("routine_id")
+      .notNull()
+      .references(() => routines.id, { onDelete: "cascade" }),
+    time: time("time"),
+    frequency: frequencyEnum("frequency").notNull(),
+    // Cada N días o semanas.
+    interval: smallint("interval").notNull().default(1),
+    // Días ISO de la semanal: 1 = lunes … 7 = domingo.
+    weekdays: smallint("weekdays").array().notNull().default([]),
+    // Desde dónde se cuenta el «cada N».
+    anchor: date("anchor", { mode: "string" }).notNull(),
+    validFrom: date("valid_from", { mode: "string" }).notNull(),
+    // Inclusive; null = sigue vigente.
+    validTo: date("valid_to", { mode: "string" }),
+  },
+  (t) => [index("routine_slots_routine_idx").on(t.routineId)],
+);
+
+// Una ocurrencia distinta sin tocar el horario, identificada por su fecha original.
 export const routineExceptions = pgTable(
   "routine_exceptions",
   {
     id: serial("id").primaryKey(),
-    itemId: integer("item_id")
+    routineId: integer("routine_id")
       .notNull()
-      .references(() => routineItems.id, { onDelete: "cascade" }),
+      .references(() => routines.id, { onDelete: "cascade" }),
     date: date("date", { mode: "string" }).notNull(),
-    kind: exceptionKindEnum("kind").notNull(),
-    // otra_hora: nueva hora; mover: nueva fecha.
-    newTime: time("new_time"),
+    kind: routineExceptionKindEnum("kind").notNull(),
+    // cambiar: nueva fecha y/o nueva hora.
     newDate: date("new_date", { mode: "string" }),
+    newTime: time("new_time"),
   },
-  (t) => [uniqueIndex("routine_exceptions_item_date_idx").on(t.itemId, t.date)],
+  (t) => [
+    uniqueIndex("routine_exceptions_routine_date_idx").on(t.routineId, t.date),
+  ],
 );
 
-// Cumplimiento de un elemento de rutina en un día; de aquí salen las rachas.
+// Existir = hecha. La fecha es la original de la ocurrencia; de aquí salen las rachas.
 export const routineLogs = pgTable(
   "routine_logs",
   {
-    itemId: integer("item_id")
+    routineId: integer("routine_id")
       .notNull()
-      .references(() => routineItems.id, { onDelete: "cascade" }),
+      .references(() => routines.id, { onDelete: "cascade" }),
     date: date("date", { mode: "string" }).notNull(),
-    done: boolean("done").notNull().default(true),
+    doneAt: timestamp("done_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.itemId, t.date] })],
+  (t) => [primaryKey({ columns: [t.routineId, t.date] })],
 );
 
 export const weeklyNotes = pgTable(
