@@ -8,6 +8,7 @@ import { verifySession } from "@/lib/session";
 import { discardTask, scheduleTask } from "../actions";
 import { CaptureBar } from "../capture-bar";
 import { PressLink } from "../press-link";
+import { TopBar } from "../top-bar";
 import { ListSkeleton } from "../skeleton";
 import { TaskText } from "../task-text";
 
@@ -62,9 +63,9 @@ async function Bandeja({ searchParams }: Props) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-    <div className="topbar">
-      <h1 className="mx-auto flex h-16 w-full max-w-3xl items-center px-3 pl-[3.75rem] text-xl font-semibold leading-none tracking-tight sm:px-6 sm:pl-[3.75rem] sm:text-2xl md:h-20 md:pl-6">Bandeja</h1>
-    </div>
+    <TopBar>
+      <h1 className="text-xl font-semibold leading-none tracking-tight sm:text-2xl">Bandeja</h1>
+    </TopBar>
     <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-4 sm:px-6">
 
       <nav className="-mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-1">

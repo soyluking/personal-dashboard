@@ -7,6 +7,8 @@ import { addDays, formatDay, formatDayShort, nowTime, todayISO } from "@/lib/dat
 import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { Menu } from "./menu";
+import { chevronLeftIcon, chevronRightIcon } from "./nav-icons";
+import { TopBar } from "./top-bar";
 import { PressLink } from "./press-link";
 import { ListSkeleton } from "./skeleton";
 import { TaskList } from "./task-list";
@@ -42,29 +44,27 @@ async function Hoy({ searchParams }: Props) {
   const link = (iso: string) => (iso === today ? "/" : `/?fecha=${iso}`);
 
   const arrow =
-    "glass flex size-9 items-center justify-center rounded-full text-lg leading-none text-muted hover:text-foreground";
+    "glass flex size-10 shrink-0 items-center justify-center rounded-full text-foreground";
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <div className="topbar">
-      <header className="mx-auto flex h-16 w-full max-w-3xl items-center gap-2 px-3 pl-[3.75rem] sm:px-6 sm:pl-[3.75rem] md:h-20 md:pl-6">
+      <TopBar>
         <PressLink href={link(addDays(day, -1))} aria-label="Día anterior" className={arrow}>
-          ‹
+          {chevronLeftIcon}
         </PressLink>
         <h1 className="min-w-0 flex-1 truncate text-center text-base font-medium capitalize leading-none tracking-tight sm:text-left sm:text-xl">
           <span className="sm:hidden">{formatDayShort(day)}</span>
           <span className="hidden sm:inline">{formatDay(day)}</span>
         </h1>
         {day !== today && (
-          <PressLink href="/" className="glass flex h-9 items-center rounded-full px-3.5 text-sm leading-none hover:text-foreground">
+          <PressLink href="/" className="glass flex h-10 items-center rounded-full px-4 text-sm leading-none text-foreground">
             Hoy
           </PressLink>
         )}
         <PressLink href={link(addDays(day, 1))} aria-label="Día siguiente" className={arrow}>
-          ›
+          {chevronRightIcon}
         </PressLink>
-      </header>
-      </div>
+      </TopBar>
       <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-4 sm:px-6">
 
         {items.length === 0 ? (

@@ -1,20 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { logout } from "./actions";
+import { Icon, closeIcon, logoutIcon, menuIcon } from "./nav-icons";
+import { setMenuOpen, useMenuOpen } from "./nav-store";
 import { PressLink } from "./press-link";
 
 type Props = { inbox: number };
-
-// Íconos de línea al estilo Gemini; heredan el color del texto.
-function Icon({ children }: { children: ReactNode }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="size-[22px] shrink-0">
-      {children}
-    </svg>
-  );
-}
 
 const SECTIONS = [
   {
@@ -39,29 +32,11 @@ const SECTIONS = [
   },
 ] as const;
 
-const menuIcon = (
-  <Icon>
-    <path d="M4 9h16M4 15h16" />
-  </Icon>
-);
-
-const closeIcon = (
-  <Icon>
-    <path d="M6 6l12 12M18 6 6 18" />
-  </Icon>
-);
-
-const logoutIcon = (
-  <Icon>
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-  </Icon>
-);
-
 // Como Gemini: en el computador, barra lateral colapsable; en el celular, menú lateral a pantalla completa.
 export function AppNav({ inbox }: Props) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [open, setOpen] = useState(false);
+  const open = useMenuOpen();
 
   const count = (href: string) => (href === "/bandeja" && inbox > 0 ? inbox : null);
 
@@ -115,12 +90,6 @@ export function AppNav({ inbox }: Props) {
         {logoutButton(collapsed)}
       </aside>
 
-      <header className="fixed left-3 top-3 z-20 md:hidden">
-        <button onClick={() => setOpen(true)} aria-label="Abrir menú" className="glass flex size-10 items-center justify-center rounded-full transition-transform active:scale-90">
-          {menuIcon}
-        </button>
-      </header>
-
       <div
         inert={!open}
         aria-hidden={!open}
@@ -130,11 +99,11 @@ export function AppNav({ inbox }: Props) {
       >
         <div className="mb-4 flex items-center justify-between pl-3">
           <span className="text-2xl font-medium">Dashboard</span>
-          <button onClick={() => setOpen(false)} aria-label="Cerrar menú" className="flex size-12 items-center justify-center rounded-full bg-white/10 transition-transform active:scale-90">
+          <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="flex size-12 items-center justify-center rounded-full bg-white/10 transition-transform active:scale-90">
             {closeIcon}
           </button>
         </div>
-        {links(false, () => setOpen(false))}
+        {links(false, () => setMenuOpen(false))}
         {logoutButton(false)}
       </div>
     </>
