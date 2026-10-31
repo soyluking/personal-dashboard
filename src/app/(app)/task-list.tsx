@@ -3,10 +3,14 @@
 import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { nowTime } from "@/lib/dates";
 import { discardTask, postponeTask, restoreTask, setTaskDone } from "./actions";
+import { changeOccurrence, restoreOccurrence, setRoutineDone } from "./rutina/actions";
+import { Icon } from "./nav-icons";
 import { SwipeRow } from "./swipe-row";
 import { TaskText } from "./task-text";
 
 export type ListTask = {
+  // Único en la lista: tareas y rutina comparten números de id.
+  key: string;
   id: number;
   text: string;
   time: string | null;
@@ -14,6 +18,8 @@ export type ListTask = {
   postponements: number;
   // Menú o decisión, ya renderizados en el servidor.
   menu: React.ReactNode;
+  // Solo la rutina: fecha original de la ocurrencia, racha y «nunca falles dos veces».
+  routine?: { date: string; streak: number | null; warn: boolean };
 };
 
 // Lo hecho baja a su sección después de esta pausa: tapar otra tarea con el dedo mientras salta es peor que esperar.
@@ -32,18 +38,18 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
     return () => clearInterval(id);
   }, [trackOverdue]);
   const [showDone, setShowDone] = useState(false);
-  const [optimistic, setOptimistic] = useOptimistic(tasks, (all, p: { id: number; done?: boolean; remove?: boolean }) =>
-    p.remove ? all.filter((t) => t.id !== p.id) : all.map((t) => (t.id === p.id ? { ...t, done: p.done ?? t.done } : t)),
+  const [optimistic, setOptimistic] = useOptimistic(tasks, (all, p: { key: string; done?: boolean; remove?: boolean }) =>
+    p.remove ? all.filter((t) => t.key !== p.key) : all.map((t) => (t.key === p.key ? { ...t, done: p.done ?? t.done } : t)),
   );
   const [, startTransition] = useTransition();
   // Tareas recién marcadas que aún no bajan a «Completadas»: dan tiempo a la animación.
-  const [waiting, setWaiting] = useState<Set<number>>(new Set());
-  const [burst, setBurst] = useState<number | null>(null);
+  const [waiting, setWaiting] = useState<Set<string>>(new Set());
+  const [burst, setBurst] = useState<string | null>(null);
   const [confetti, setConfetti] = useState<{ left: number; delay: number; color: string; spin: number }[] | null>(null);
-  const rows = useRef(new Map<number, HTMLLIElement>());
-  const tops = useRef(new Map<number, number>());
+  const rows = useRef(new Map<string, HTMLLIElement>());
+  const tops = useRef(new Map<string, number>());
 
-  const orderKey = (t: ListTask) => t.done && !waiting.has(t.id);
+  const orderKey = (t: ListTask) => t.done && !waiting.has(t.key);
   const pending = optimistic.filter((t) => !orderKey(t));
   const finished = optimistic.filter(orderKey);
   const ordered = [...pending, ...finished];
@@ -52,9 +58,9 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
   const doneCount = optimistic.filter((t) => t.done).length;
 
   // FLIP: cada fila anima desde donde estaba hasta donde quedó.
-  const order = ordered.map((t) => t.id).join(",");
+  const order = ordered.map((t) => t.key).join(",");
   useLayoutEffect(() => {
-    const next = new Map<number, number>();
+    const next = new Map<string, number>();
     rows.current.forEach((el, id) => next.set(id, el.getBoundingClientRect().top));
     if (!reducedMotion()) {
       next.forEach((top, id) => {
@@ -76,14 +82,14 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
     const setWaitingFor = (wait: boolean) =>
       setWaiting((w) => {
         const next = new Set(w);
-        if (wait) next.add(t.id);
-        else next.delete(t.id);
+        if (wait) next.add(t.key);
+        else next.delete(t.key);
         return next;
       });
     if (done && !reducedMotion()) {
       setWaitingFor(true);
       setTimeout(() => setWaitingFor(false), SETTLE_MS);
-      setBurst(t.id);
+      setBurst(t.key);
       setTimeout(() => setBurst(null), 700);
       if (doneCount + 1 === total) {
         setConfetti(
@@ -99,11 +105,17 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
     }
     if (!done) setWaitingFor(false);
     startTransition(async () => {
-      setOptimistic({ id: t.id, done });
+      setOptimistic({ key: t.key, done });
       const data = new FormData();
-      data.set("id", String(t.id));
       data.set("done", String(done));
-      await setTaskDone(data);
+      if (t.routine) {
+        data.set("routineId", String(t.id));
+        data.set("date", t.routine.date);
+        await setRoutineDone(data);
+      } else {
+        data.set("id", String(t.id));
+        await setTaskDone(data);
+      }
     });
   };
 
@@ -119,7 +131,7 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
 
   const leave = (t: ListTask, action: (data: FormData) => Promise<void>, message: string) => {
     startTransition(async () => {
-      setOptimistic({ id: t.id, remove: true });
+      setOptimistic({ key: t.key, remove: true });
       const data = new FormData();
       data.set("id", String(t.id));
       await action(data);
@@ -137,9 +149,25 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
     showToast(message, undo);
   };
 
+  // Saltar la rutina este día: ni suma ni corta la racha.
+  const skip = (t: ListTask) => {
+    const data = new FormData();
+    data.set("routineId", String(t.id));
+    data.set("date", t.routine!.date);
+    startTransition(async () => {
+      setOptimistic({ key: t.key, remove: true });
+      data.set("kind", "saltar");
+      await changeOccurrence(data);
+    });
+    showToast("Saltada este día", () => {
+      setToast(null);
+      startTransition(() => restoreOccurrence(data));
+    });
+  };
+
   const complete = (t: ListTask) => {
     toggle(t);
-    showToast("Tarea completada", () => {
+    showToast(t.routine ? "Hecha" : "Tarea completada", () => {
       setToast(null);
       toggle({ ...t, done: true });
     });
@@ -148,20 +176,39 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
   const row = (t: ListTask) => {
     const overdue = trackOverdue && !t.done && t.time !== null && t.time.slice(0, 5) < clock;
     return (
-      <li key={t.id} ref={(el) => void (el ? rows.current.set(t.id, el) : rows.current.delete(t.id))}>
+      <li key={t.key} ref={(el) => void (el ? rows.current.set(t.key, el) : rows.current.delete(t.key))}>
         <SwipeRow
           enabled={!t.done}
           onComplete={() => complete(t)}
-          onPostpone={() => leave(t, postponeTask, "Tarea postergada")}
-          onDiscard={() => leave(t, discardTask, "Tarea descartada")}
+          actions={
+            t.routine
+              ? [{ label: "Saltar", tone: "amber", onClick: () => skip(t) }]
+              : [
+                  { label: "Postergar", tone: "amber", onClick: () => leave(t, postponeTask, "Tarea postergada") },
+                  { label: "Descartar", tone: "red", onClick: () => leave(t, discardTask, "Tarea descartada") },
+                ]
+          }
         >
         <div
           className={`row-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover ${
             overdue ? "bg-red-500/10" : ""
           }`}
         >
-          <Check done={t.done} burst={burst === t.id} onToggle={() => toggle(t)} />
-          <TaskText id={t.id} text={t.text} time={t.time} done={t.done} />
+          <Check done={t.done} burst={burst === t.key} onToggle={() => toggle(t)} />
+          {t.routine ? (
+            <span className={`flex min-w-0 flex-1 items-center gap-1.5 ${t.done ? "text-muted line-through" : ""}`}>
+              <span aria-label="Rutina" className="shrink-0 text-muted">
+                <Icon size={15}>
+                  <path d="M17 2l4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3" />
+                </Icon>
+              </span>
+              <span className="min-w-0 truncate">{t.text}</span>
+              {t.routine.warn && !t.done && <span className="shrink-0 text-xs text-amber-300">la última no; hoy no falles</span>}
+            </span>
+          ) : (
+            <TaskText id={t.id} text={t.text} time={t.time} done={t.done} />
+          )}
+          {t.routine?.streak ? <span className="text-sm tabular-nums text-muted">🔥 {t.routine.streak}</span> : null}
           {t.postponements > 0 && (
             <span
               className={`rounded-md px-1.5 py-0.5 text-xs ${

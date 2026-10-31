@@ -4,19 +4,20 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 // Distancia que confirma el gesto, ancho del panel de acciones y franja del borde donde iOS usa «atrás».
 const TRIGGER = 72;
-const ACTIONS_W = 176;
+const ACTION_W = 88;
 const EDGE = 24;
 
 type Props = {
   enabled: boolean;
   onComplete: () => void;
-  onPostpone: () => void;
-  onDiscard: () => void;
+  // Acciones del panel de la izquierda (tareas: postergar y descartar; rutina: saltar).
+  actions: { label: string; tone: "amber" | "red"; onClick: () => void }[];
   children: ReactNode;
 };
 
-// Derecha completa; izquierda abre «Postergar» y «Descartar». Solo con el dedo: con mouse no tiene sentido arrastrar.
-export function SwipeRow({ enabled, onComplete, onPostpone, onDiscard, children }: Props) {
+// Derecha completa; izquierda abre las acciones. Solo con el dedo: con mouse no tiene sentido arrastrar.
+export function SwipeRow({ enabled, onComplete, actions, children }: Props) {
+  const ACTIONS_W = ACTION_W * actions.length;
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [open, setOpen] = useState(false);
@@ -124,28 +125,20 @@ export function SwipeRow({ enabled, onComplete, onPostpone, onDiscard, children 
       {dx < 0 && (
         <div className="absolute inset-y-0 right-0 overflow-hidden rounded-lg" style={{ width: -dx }}>
           <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTIONS_W }}>
-            <button
-              type="button"
-              tabIndex={open ? 0 : -1}
-              onClick={() => {
-                close();
-                onPostpone();
-              }}
-              className={`${action} bg-amber-500/25 text-amber-200`}
-            >
-              Postergar
-            </button>
-            <button
-              type="button"
-              tabIndex={open ? 0 : -1}
-              onClick={() => {
-                close();
-                onDiscard();
-              }}
-              className={`${action} bg-red-500/25 text-red-200`}
-            >
-              Descartar
-            </button>
+            {actions.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                tabIndex={open ? 0 : -1}
+                onClick={() => {
+                  close();
+                  a.onClick();
+                }}
+                className={`${action} ${a.tone === "amber" ? "bg-amber-500/25 text-amber-200" : "bg-red-500/25 text-red-200"}`}
+              >
+                {a.label}
+              </button>
+            ))}
           </div>
         </div>
       )}

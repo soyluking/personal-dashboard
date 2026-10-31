@@ -6,14 +6,17 @@ import { tasks } from "@/db/schema";
 import { addDays, formatDay, formatDayShort, nowTime, todayISO } from "@/lib/dates";
 import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
+import { missedLast, occurrencesOn, resolved, streak } from "@/lib/routine";
+import { loadRoutines } from "@/lib/routines";
 import { Menu } from "./menu";
 import { chevronLeftIcon, chevronRightIcon } from "./nav-icons";
 import { TopBar } from "./top-bar";
 import { PressLink } from "./press-link";
 import { ListSkeleton } from "./skeleton";
-import { TaskList } from "./task-list";
+import { TaskList, type ListTask } from "./task-list";
 import { CaptureBar } from "./capture-bar";
 import { discardTask, postponeTask, scheduleTask } from "./actions";
+import { changeOccurrence } from "./rutina/actions";
 
 type Props = { searchParams: Promise<{ fecha?: string }> };
 
@@ -35,11 +38,53 @@ async function Hoy({ searchParams }: Props) {
 
   await rollOverOverdue(today);
 
-  const items = await db
-    .select()
-    .from(tasks)
-    .where(and(eq(tasks.date, day), ne(tasks.status, "descartada")))
-    .orderBy(sql`${tasks.time} asc nulls last`, asc(tasks.id));
+  const [taskRows, routineData] = await Promise.all([
+    db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.date, day), ne(tasks.status, "descartada")))
+      .orderBy(sql`${tasks.time} asc nulls last`, asc(tasks.id)),
+    loadRoutines(),
+  ]);
+
+  const nextLabel = day === today ? "Pasar a mañana" : "Pasar al día siguiente";
+  const taskItems: ListTask[] = taskRows.map((t) => {
+    const done = t.status === "hecha";
+    const mustDecide = !done && t.postponements >= DECISION_THRESHOLD;
+    return {
+      key: `t${t.id}`,
+      id: t.id,
+      text: t.text,
+      time: t.time,
+      done,
+      postponements: t.postponements,
+      menu: mustDecide ? <Decision id={t.id} /> : <TaskMenu id={t.id} nextLabel={nextLabel} />,
+    };
+  });
+
+  // La rutina no se guarda por día: se calcula desde horarios y excepciones.
+  const routineItems: ListTask[] = routineData.flatMap((r) =>
+    occurrencesOn(r.slots, r.exceptions, day).map((o) => {
+      const history = r.trackStreak ? resolved(r.slots, r.exceptions, r.done, today) : [];
+      return {
+        key: `r${r.id}-${o.date}`,
+        id: r.id,
+        text: r.name,
+        time: o.time,
+        done: r.done.has(o.date),
+        postponements: 0,
+        menu: <OccurrenceMenu routineId={r.id} date={o.date} />,
+        routine: {
+          date: o.date,
+          streak: r.trackStreak ? streak(history) : null,
+          warn: day === today && missedLast(history),
+        },
+      };
+    }),
+  );
+
+  // Por hora y lo sin hora al final; a igual hora, la rutina primero.
+  const items = [...routineItems, ...taskItems].sort((a, b) => (a.time ?? "99").localeCompare(b.time ?? "99"));
 
   const link = (iso: string) => (iso === today ? "/" : `/?fecha=${iso}`);
 
@@ -74,22 +119,7 @@ async function Hoy({ searchParams }: Props) {
             day={day}
             now={nowTime()}
             trackOverdue={day === today}
-            tasks={items.map((t) => {
-              const done = t.status === "hecha";
-              const mustDecide = !done && t.postponements >= DECISION_THRESHOLD;
-              return {
-                id: t.id,
-                text: t.text,
-                time: t.time,
-                done,
-                postponements: t.postponements,
-                menu: mustDecide ? (
-                  <Decision id={t.id} />
-                ) : (
-                  <TaskMenu id={t.id} nextLabel={day === today ? "Pasar a mañana" : "Pasar al día siguiente"} />
-                ),
-              };
-            })}
+            tasks={items}
           />
         )}
       </main>
@@ -122,6 +152,36 @@ function TaskMenu({ id, nextLabel }: { id: number; nextLabel: string }) {
         <input type="hidden" name="id" value={id} />
         <button className={`${menuItem} text-muted`}>Descartar</button>
       </form>
+    </Menu>
+  );
+}
+
+// Solo este día: no toca el horario de la rutina. Editarla vale para todos los días.
+function OccurrenceMenu({ routineId, date }: { routineId: number; date: string }) {
+  const field = "min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-1 text-xs";
+  return (
+    <Menu label="Más acciones">
+      <form action={changeOccurrence} className="flex items-center gap-1 px-2 py-1">
+        <input type="hidden" name="routineId" value={routineId} />
+        <input type="hidden" name="date" value={date} />
+        <input type="time" name="newTime" required aria-label="Otra hora este día" className={field} />
+        <button className="rounded-md px-2 py-1 text-sm hover:bg-hover">Hora</button>
+      </form>
+      <form action={changeOccurrence} className="flex items-center gap-1 px-2 py-1">
+        <input type="hidden" name="routineId" value={routineId} />
+        <input type="hidden" name="date" value={date} />
+        <input type="date" name="newDate" required aria-label="Mover a otro día" className={field} />
+        <button className="rounded-md px-2 py-1 text-sm hover:bg-hover">Mover</button>
+      </form>
+      <form action={changeOccurrence}>
+        <input type="hidden" name="routineId" value={routineId} />
+        <input type="hidden" name="date" value={date} />
+        <input type="hidden" name="kind" value="saltar" />
+        <button className={menuItem}>Saltar este día</button>
+      </form>
+      <PressLink href={`/rutina/editar?id=${routineId}`} className={menuItem}>
+        Editar rutina
+      </PressLink>
     </Menu>
   );
 }
