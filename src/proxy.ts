@@ -3,5 +3,6 @@
 export { auth as proxy } from "@/auth";
 
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  // El manifest y los íconos quedan fuera: el teléfono los pide sin sesión al instalar.
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon).*)"],
 };
