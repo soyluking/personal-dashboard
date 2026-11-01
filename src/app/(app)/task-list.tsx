@@ -396,7 +396,7 @@ type Change = { key: string; done?: boolean; remove?: boolean } | { order: strin
 
 // Fila que se arrastra completa. Soltarla no cuenta como toque: no abre la edición.
 function SortableRow({ id, rowRef, children }: { id: string; rowRef: (el: HTMLLIElement | null) => void; children: React.ReactNode }) {
-  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
   const dragged = useRef(false);
   useEffect(() => {
     if (isDragging) dragged.current = true;
@@ -405,6 +405,8 @@ function SortableRow({ id, rowRef, children }: { id: string; rowRef: (el: HTMLLI
     <li
       ref={(el) => {
         setNodeRef(el);
+        // El teclado reordena solo con el foco en la fila: espacio o Enter dentro de ella (al editar, en ✓ o «⋯») son de ese elemento.
+        setActivatorNodeRef(el);
         rowRef(el);
       }}
       {...attributes}
