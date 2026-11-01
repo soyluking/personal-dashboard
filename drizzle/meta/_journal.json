@@ -29,6 +29,13 @@
       "when": 1793484929291,
       "tag": "0003_users",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793503550703,
+      "tag": "0004_task_position",
+      "breakpoints": true
     }
   ]
 }

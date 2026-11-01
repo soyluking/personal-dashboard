@@ -13,6 +13,7 @@ export async function rollOverOverdue(userId: number, today: string) {
     .set({
       postponements: sql`${tasks.postponements} + (${today}::date - ${tasks.date})`,
       date: today,
+      position: null,
     })
     .where(and(eq(tasks.userId, userId), eq(tasks.status, "pendiente"), lt(tasks.date, today)));
 }

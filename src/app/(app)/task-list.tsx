@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type Modifier } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { nowTime } from "@/lib/dates";
 import { STARS_PER_DONE, type Experience } from "@/lib/experiences";
 import { chime } from "./chime";
 import { Chispa, cheer, greeting, type Line } from "./chispa";
-import { discardTask, postponeTask, restoreTask, setTaskDone } from "./actions";
+import { discardTask, postponeTask, reorderTasks, restoreTask, setTaskDone } from "./actions";
 import { changeOccurrence, restoreOccurrence, setRoutineDone } from "./rutina/actions";
 import { Icon } from "./nav-icons";
 import { SwipeRow } from "./swipe-row";
@@ -28,6 +31,19 @@ export type ListTask = {
 // Lo hecho baja a su sección después de esta pausa: tapar otra tarea con el dedo mientras salta es peor que esperar.
 const SETTLE_MS = 700;
 const COLORS = ["#3f6fe6", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
+// Arrastrar solo sube o baja.
+const vertical: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+const dragA11y = {
+  screenReaderInstructions: {
+    draggable: "Para reordenar, presiona espacio, muévela con las flechas y presiona espacio otra vez para soltarla.",
+  },
+  announcements: {
+    onDragStart: () => "Tarea tomada.",
+    onDragOver: () => undefined,
+    onDragEnd: () => "Tarea soltada.",
+    onDragCancel: () => "Sin cambios.",
+  },
+};
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 type Look = Pick<Experience, "overdueAlert" | "postponeCounter" | "collapseDone" | "reward">;
@@ -55,9 +71,16 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
     return () => clearInterval(id);
   }, [trackOverdue]);
   const [showDone, setShowDone] = useState(false);
-  const [optimistic, setOptimistic] = useOptimistic(tasks, (all, p: { key: string; done?: boolean; remove?: boolean }) =>
-    p.remove ? all.filter((t) => t.key !== p.key) : all.map((t) => (t.key === p.key ? { ...t, done: p.done ?? t.done } : t)),
-  );
+  const [optimistic, setOptimistic] = useOptimistic(tasks, (all, p: Change) => {
+    if ("order" in p) {
+      // Las reordenadas se reparten en los mismos lugares que ocupaban, en el orden nuevo.
+      const moved = new Set(p.order);
+      const queue = p.order.map((key) => all.find((t) => t.key === key)!);
+      let i = 0;
+      return all.map((t) => (moved.has(t.key) ? queue[i++] : t));
+    }
+    return p.remove ? all.filter((t) => t.key !== p.key) : all.map((t) => (t.key === p.key ? { ...t, done: p.done ?? t.done } : t));
+  });
   const [, startTransition] = useTransition();
   // Tareas recién marcadas que aún no bajan a «Completadas»: dan tiempo a la animación.
   const [waiting, setWaiting] = useState<Set<string>>(new Set());
@@ -65,6 +88,8 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
   const [confetti, setConfetti] = useState<{ left: number; delay: number; color: string; spin: number }[] | null>(null);
   const rows = useRef(new Map<string, HTMLLIElement>());
   const tops = useRef(new Map<string, number>());
+  // Al soltar, la fila ya está donde queda: la animación FLIP la haría saltar desde su lugar viejo.
+  const skipFlip = useRef(false);
 
   const orderKey = (t: ListTask) => t.done && !waiting.has(t.key);
   const pending = optimistic.filter((t) => !orderKey(t));
@@ -82,7 +107,7 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
   useLayoutEffect(() => {
     const next = new Map<string, number>();
     rows.current.forEach((el, id) => next.set(id, el.getBoundingClientRect().top));
-    if (!reducedMotion()) {
+    if (!reducedMotion() && !skipFlip.current) {
       next.forEach((top, id) => {
         const before = tops.current.get(id);
         const el = rows.current.get(id);
@@ -94,7 +119,24 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
       });
     }
     tops.current = next;
+    skipFlip.current = false;
   }, [order]);
+
+  // Se reordena a mano solo lo pendiente sin hora: la hora manda y la rutina queda fija.
+  const movable = pending.filter((t) => !t.routine && t.time === null && !t.done);
+  const movableKeys = movable.map((t) => t.key);
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const next = arrayMove(movableKeys, movableKeys.indexOf(String(active.id)), movableKeys.indexOf(String(over.id)));
+    const ids = next.map((key) => movable.find((t) => t.key === key)!.id);
+    skipFlip.current = true;
+    navigator.vibrate?.(8);
+    startTransition(async () => {
+      setOptimistic({ order: next });
+      await reorderTasks(day, ids);
+    });
+  };
 
   const toggle = (t: ListTask) => {
     const done = !t.done;
@@ -198,10 +240,21 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
     });
   };
 
-  const row = (t: ListTask) => {
+  const rowRef = (key: string) => (el: HTMLLIElement | null) => void (el ? rows.current.set(key, el) : rows.current.delete(key));
+  const row = (t: ListTask) =>
+    movable.length > 1 && movableKeys.includes(t.key) ? (
+      <SortableRow key={t.key} id={t.key} rowRef={rowRef(t.key)}>
+        {(handle) => body(t, handle)}
+      </SortableRow>
+    ) : (
+      <li key={t.key} ref={rowRef(t.key)}>
+        {body(t, null)}
+      </li>
+    );
+
+  const body = (t: ListTask, handle: React.ReactNode) => {
     const overdue = look.overdueAlert && trackOverdue && !t.done && t.time !== null && t.time.slice(0, 5) < clock;
     return (
-      <li key={t.key} ref={(el) => void (el ? rows.current.set(t.key, el) : rows.current.delete(t.key))}>
         <SwipeRow
           enabled={!t.done}
           onComplete={() => complete(t)}
@@ -255,9 +308,9 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
             </span>
           )}
           {!t.done && t.menu}
+          {handle}
         </div>
         </SwipeRow>
-      </li>
     );
   };
 
@@ -268,6 +321,8 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
       ) : (
         total > 0 && <Progress done={doneCount} total={total} />
       )}
+      <DndContext id="hoy" sensors={sensors} collisionDetection={closestCenter} modifiers={[vertical]} onDragEnd={onDragEnd} accessibility={dragA11y}>
+      <SortableContext items={movableKeys} strategy={verticalListSortingStrategy}>
       <ul className="flex flex-col claro:gap-2">
         {pending.map(row)}
         {!look.collapseDone && finished.map(row)}
@@ -286,6 +341,8 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
         )}
         {look.collapseDone && showDone && finished.map(row)}
       </ul>
+      </SortableContext>
+      </DndContext>
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-30 flex justify-center px-5">
           <div key={toast.key} role="status" className="glass row-in pointer-events-auto flex items-center gap-4 rounded-full py-2 pl-5 pr-2 text-sm">
@@ -308,6 +365,42 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
         </div>
       )}
     </>
+  );
+}
+
+type Change = { key: string; done?: boolean; remove?: boolean } | { order: string[] };
+
+// Fila que se arrastra desde su asa. El asa no inicia el swipe de la fila.
+function SortableRow({ id, rowRef, children }: { id: string; rowRef: (el: HTMLLIElement | null) => void; children: (handle: React.ReactNode) => React.ReactNode }) {
+  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <li
+      ref={(el) => {
+        setNodeRef(el);
+        rowRef(el);
+      }}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={isDragging ? "relative z-10 rounded-lg bg-surface shadow-lg" : undefined}
+    >
+      {children(
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          onPointerDown={(e) => {
+            listeners?.onPointerDown?.(e);
+            e.stopPropagation();
+          }}
+          aria-label="Reordenar"
+          className="-mr-1 flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-foreground active:cursor-grabbing"
+        >
+          <svg viewBox="0 0 16 16" className="size-4" fill="currentColor" aria-hidden>
+            {[4, 8, 12].flatMap((y) => [6, 10].map((x) => <circle key={`${x}${y}`} cx={x} cy={y} r="1.2" />))}
+          </svg>
+        </button>,
+      )}
+    </li>
   );
 }
 

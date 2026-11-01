@@ -71,6 +71,8 @@ export const tasks = pgTable(
     time: time("time"),
     status: taskStatusEnum("status").notNull().default("pendiente"),
     postponements: integer("postponements").notNull().default(0),
+    // Orden a mano de lo sin hora, dentro de su día. Null = nueva: entra según la experiencia.
+    position: integer("position"),
     // Cuándo se marcó hecha; null si no lo está. Para medir el piloto y los combos.
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

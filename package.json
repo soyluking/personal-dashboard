@@ -13,6 +13,9 @@
     "db:claim-owner": "node --env-file-if-exists=.env.local scripts/claim-owner.mjs"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.3",
     "next-auth": "5.0.0-beta.32",

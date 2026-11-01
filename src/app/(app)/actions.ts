@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { signOut } from "@/auth";
 import { db } from "@/db";
@@ -40,7 +40,7 @@ export async function editTask(id: number, input: string) {
   const { text, date, time } = parseEdit(input, task.date, todayISO());
   await db
     .update(tasks)
-    .set({ text, date, time, ...(date !== task.date && { postponements: 0 }) })
+    .set({ text, date, time, ...(date !== task.date && { postponements: 0, position: null }) })
     .where(ownTask(user.id, id));
   revalidate();
 }
@@ -55,6 +55,18 @@ export async function setTaskDone(formData: FormData) {
   revalidate();
 }
 
+// Guarda el orden a mano de lo sin hora de un día: `ids` va de arriba abajo.
+export async function reorderTasks(day: string, ids: number[]) {
+  const user = await verifySession();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !ids.length || ids.length > 200 || !ids.every(Number.isInteger)) return;
+  const cases = sql.join(ids.map((id, i) => sql`when ${id} then ${i}`), sql` `);
+  await db
+    .update(tasks)
+    .set({ position: sql`case ${tasks.id} ${cases} end` })
+    .where(and(eq(tasks.userId, user.id), eq(tasks.date, day), inArray(tasks.id, ids)));
+  revalidate();
+}
+
 // Pasa la tarea al día siguiente de su fecha y suma una postergación.
 export async function postponeTask(formData: FormData) {
   const user = await verifySession();
@@ -63,6 +75,7 @@ export async function postponeTask(formData: FormData) {
     .set({
       date: sql`${tasks.date} + 1`,
       postponements: sql`${tasks.postponements} + 1`,
+      position: null,
     })
     .where(ownTask(user.id, taskId(formData)));
   revalidate();
@@ -78,6 +91,7 @@ export async function scheduleTask(formData: FormData) {
     .set({
       date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
       postponements: 0,
+      position: null,
     })
     .where(ownTask(user.id, taskId(formData)));
   revalidate();

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { and, asc, count, eq, ne, sql } from "drizzle-orm";
+import { and, count, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { addDays, formatDay, formatDayShort, nowTime, todayISO } from "@/lib/dates";
@@ -9,6 +9,7 @@ import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { missedLast, occurrencesOn, resolved, streak } from "@/lib/routine";
 import { loadRoutines } from "@/lib/routines";
+import { sortDay } from "@/lib/order";
 import { Menu } from "./menu";
 import { chevronLeftIcon, chevronRightIcon } from "./nav-icons";
 import { TopBar } from "./top-bar";
@@ -44,8 +45,7 @@ async function Hoy({ searchParams }: Props) {
     db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.userId, user.id), eq(tasks.date, day), ne(tasks.status, "descartada")))
-      .orderBy(sql`${tasks.time} asc nulls last`, asc(tasks.id)),
+      .where(and(eq(tasks.userId, user.id), eq(tasks.date, day), ne(tasks.status, "descartada"))),
     loadRoutines(user.id),
     exp.reward === "chispa"
       ? db.select({ doneTasks: count() }).from(tasks).where(and(eq(tasks.userId, user.id), eq(tasks.status, "hecha")))
@@ -90,13 +90,14 @@ async function Hoy({ searchParams }: Props) {
     }),
   );
 
-  // Por hora; a igual hora, la rutina primero. Lo sin hora va al final o, si lo nuevo entra arriba,
-  // al principio con lo último anotado primero, sobre la rutina sin hora.
-  const untimed = exp.newOnTop ? "00" : "99";
-  const merged = exp.newOnTop ? [...taskItems.toReversed(), ...routineItems] : [...routineItems, ...taskItems];
-  const items = merged.sort((a, b) =>
-    (a.time ?? untimed).localeCompare(b.time ?? untimed),
-  );
+  // La hora manda; lo sin hora sigue el orden a mano (ver `sortDay`).
+  const items = sortDay(
+    [
+      ...taskItems.map((item, i) => ({ item, time: item.time, position: taskRows[i].position, seq: item.id, routine: false })),
+      ...routineItems.map((item) => ({ item, time: item.time, position: null, seq: item.id, routine: true })),
+    ],
+    exp.newOnTop,
+  ).map((d) => d.item);
 
   const link = (iso: string) => (iso === today ? "/" : `/?fecha=${iso}`);
 
