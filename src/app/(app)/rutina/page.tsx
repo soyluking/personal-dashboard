@@ -19,11 +19,11 @@ export default function RutinaPage() {
 }
 
 async function Rutina() {
-  await verifySession();
+  const user = await verifySession();
   await connection();
   const today = todayISO();
 
-  const items = (await loadRoutines())
+  const items = (await loadRoutines(user.id))
     .filter((r) => r.archivedAt === null)
     .map((r) => {
       const current = r.slots.filter((s) => s.validTo === null || s.validTo >= today);

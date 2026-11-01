@@ -4,6 +4,8 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { areaEnum, tasks } from "@/db/schema";
 import { addDays, todayISO } from "@/lib/dates";
+import { redirect } from "next/navigation";
+import { experienceOf } from "@/lib/experiences";
 import { verifySession } from "@/lib/session";
 import { discardTask, scheduleTask } from "../actions";
 import { CaptureBar } from "../capture-bar";
@@ -26,7 +28,9 @@ export default function BandejaPage({ searchParams }: Props) {
 }
 
 async function Bandeja({ searchParams }: Props) {
-  await verifySession();
+  const user = await verifySession();
+  // La bandeja es de la experiencia ejecutiva; en las otras, lo anotado queda en el día.
+  if (!experienceOf(user).areasAndInbox) redirect("/");
   await connection();
   const { area } = await searchParams;
   const today = todayISO();
@@ -41,7 +45,7 @@ async function Bandeja({ searchParams }: Props) {
   const items = await db
     .select()
     .from(tasks)
-    .where(and(isNull(tasks.date), eq(tasks.status, "pendiente"), filter))
+    .where(and(eq(tasks.userId, user.id), isNull(tasks.date), eq(tasks.status, "pendiente"), filter))
     .orderBy(asc(tasks.createdAt));
 
   const chip = (value: string | undefined, label: string) => {

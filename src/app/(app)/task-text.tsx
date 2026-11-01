@@ -53,7 +53,7 @@ export function TaskText({ id, text, time, done }: Props) {
     <button
       onClick={() => setEditing(true)}
       title="Editar"
-      className={`min-w-0 flex-1 text-left ${done ? "text-muted line-through" : ""}`}
+      className={`min-w-0 flex-1 text-left ${done ? "strike text-muted" : ""}`}
     >
       {shown}
     </button>

@@ -95,7 +95,7 @@ export function SwipeRow({ enabled, onComplete, actions, children }: Props) {
   return (
     <div
       ref={ref}
-      className="relative rounded-lg has-[details[open]]:z-20"
+      className="relative rounded-lg claro:rounded-2xl has-[details[open]]:z-20"
       style={{ touchAction: enabled ? "pan-y" : undefined }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -114,8 +114,8 @@ export function SwipeRow({ enabled, onComplete, actions, children }: Props) {
       {dx > 0 && (
         <div
           aria-hidden
-          className={`absolute inset-y-0 left-0 flex items-center rounded-lg pl-4 text-lg transition-colors ${
-            dx >= TRIGGER ? "bg-green-500/40 text-green-100" : "bg-green-500/15 text-green-300"
+          className={`absolute inset-y-0 left-0 flex items-center rounded-lg pl-4 claro:rounded-2xl text-lg transition-colors ${
+            dx >= TRIGGER ? "bg-green-500/40 text-green-100 claro:text-green-900" : "bg-green-500/15 text-green-300 claro:text-green-700"
           }`}
           style={{ width: dx }}
         >
@@ -123,7 +123,7 @@ export function SwipeRow({ enabled, onComplete, actions, children }: Props) {
         </div>
       )}
       {dx < 0 && (
-        <div className="absolute inset-y-0 right-0 overflow-hidden rounded-lg" style={{ width: -dx }}>
+        <div className="absolute inset-y-0 right-0 overflow-hidden rounded-lg claro:rounded-2xl" style={{ width: -dx }}>
           <div className="absolute inset-y-0 right-0 flex" style={{ width: ACTIONS_W }}>
             {actions.map((a) => (
               <button
@@ -134,7 +134,7 @@ export function SwipeRow({ enabled, onComplete, actions, children }: Props) {
                   close();
                   a.onClick();
                 }}
-                className={`${action} ${a.tone === "amber" ? "bg-amber-500/25 text-amber-200" : "bg-red-500/25 text-red-200"}`}
+                className={`${action} ${a.tone === "amber" ? "bg-amber-500/25 text-amber-200 claro:text-amber-900" : "bg-red-500/25 text-red-200 claro:text-red-800"}`}
               >
                 {a.label}
               </button>

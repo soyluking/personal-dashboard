@@ -40,6 +40,10 @@ export function RoutineForm({ today, areas, initial }: Props) {
           <input type="checkbox" name="trackStreak" defaultChecked={initial?.trackStreak ?? true} className="size-5 accent-[var(--accent)]" />
           <span>Llevar racha</span>
         </label>
+        {areas.length === 0 ? (
+          // Sin áreas en esta experiencia: se conserva la que tenía.
+          <input type="hidden" name="area" value={initial?.area ?? ""} />
+        ) : (
         <label className="flex items-center gap-2">
           <span className="text-sm text-muted">Área</span>
           <select name="area" defaultValue={initial?.area ?? ""} className={`${field} py-1.5 capitalize`}>
@@ -51,6 +55,7 @@ export function RoutineForm({ today, areas, initial }: Props) {
             ))}
           </select>
         </label>
+        )}
       </div>
 
       {slots.map((s, i) => {

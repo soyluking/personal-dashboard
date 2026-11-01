@@ -2,6 +2,9 @@
 
 import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { nowTime } from "@/lib/dates";
+import { STARS_PER_DONE, type Experience } from "@/lib/experiences";
+import { chime } from "./chime";
+import { Chispa, cheer, greeting, type Line } from "./chispa";
 import { discardTask, postponeTask, restoreTask, setTaskDone } from "./actions";
 import { changeOccurrence, restoreOccurrence, setRoutineDone } from "./rutina/actions";
 import { Icon } from "./nav-icons";
@@ -27,8 +30,22 @@ const SETTLE_MS = 700;
 const COLORS = ["#3f6fe6", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// `now` es la hora del servidor («HH:MM»); solo hoy se marca lo vencido (`overdue` en falso para otros días).
-export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[]; day: string; now: string; trackOverdue: boolean }) {
+type Look = Pick<Experience, "overdueAlert" | "postponeCounter" | "collapseDone" | "reward">;
+
+type Props = {
+  tasks: ListTask[];
+  day: string;
+  // Hora del servidor («HH:MM»); solo hoy se marca lo vencido (`trackOverdue` en falso para otros días).
+  now: string;
+  trackOverdue: boolean;
+  look: Look;
+  // Estrellas ganadas hasta ahora según el servidor (premio «chispa»).
+  stars: number;
+  name: string | null;
+};
+
+export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: Props) {
+  const chispa = look.reward === "chispa";
   const [clock, setClock] = useState(now);
   useEffect(() => {
     if (!trackOverdue) return;
@@ -56,6 +73,9 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
 
   const total = optimistic.length;
   const doneCount = optimistic.filter((t) => t.done).length;
+  // Lo marcado o desmarcado mientras el servidor no responde ya cuenta.
+  const starCount = stars + STARS_PER_DONE * (doneCount - tasks.filter((t) => t.done).length);
+  const [line, setLine] = useState<{ line: Line; key: number }>(() => ({ line: greeting(name, now, tasks.length === 0), key: 0 }));
 
   // FLIP: cada fila anima desde donde estaba hasta donde quedó.
   const order = ordered.map((t) => t.key).join(",");
@@ -86,6 +106,11 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
         else next.delete(t.key);
         return next;
       });
+    if (done && chispa) {
+      const allDone = doneCount + 1 === total;
+      chime(allDone);
+      setLine((l) => ({ line: cheer(allDone), key: l.key + 1 }));
+    }
     if (done && !reducedMotion()) {
       setWaitingFor(true);
       setTimeout(() => setWaitingFor(false), SETTLE_MS);
@@ -174,7 +199,7 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
   };
 
   const row = (t: ListTask) => {
-    const overdue = trackOverdue && !t.done && t.time !== null && t.time.slice(0, 5) < clock;
+    const overdue = look.overdueAlert && trackOverdue && !t.done && t.time !== null && t.time.slice(0, 5) < clock;
     return (
       <li key={t.key} ref={(el) => void (el ? rows.current.set(t.key, el) : rows.current.delete(t.key))}>
         <SwipeRow
@@ -190,26 +215,31 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
           }
         >
         <div
-          className={`row-in flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover ${
+          className={`row-in relative flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover claro:rounded-2xl claro:bg-card claro:px-4 claro:py-3 claro:shadow-[0_1px_4px_rgb(43_34_64/0.08)] ${
             overdue ? "bg-red-500/10" : ""
-          }`}
+          } ${chispa && burst === t.key ? "pop" : ""}`}
         >
+          {chispa && burst === t.key && (
+            <span aria-hidden className="float-up pointer-events-none absolute left-9 top-0 text-sm font-bold text-star">
+              +{STARS_PER_DONE} ⭐
+            </span>
+          )}
           <Check done={t.done} burst={burst === t.key} onToggle={() => toggle(t)} />
           {t.routine ? (
-            <span className={`flex min-w-0 flex-1 items-center gap-1.5 ${t.done ? "text-muted line-through" : ""}`}>
+            <span className={`flex min-w-0 flex-1 items-center gap-1.5 ${t.done ? "text-muted" : ""}`}>
               <span aria-label="Rutina" className="shrink-0 text-muted">
                 <Icon size={15}>
                   <path d="M17 2l4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3" />
                 </Icon>
               </span>
-              <span className="min-w-0 truncate">{t.text}</span>
+              <span className={`min-w-0 truncate ${t.done ? "strike" : ""}`}>{t.text}</span>
               {t.routine.warn && !t.done && <span className="shrink-0 text-xs text-amber-300">la última no; hoy no falles</span>}
             </span>
           ) : (
             <TaskText id={t.id} text={t.text} time={t.time} done={t.done} />
           )}
           {t.routine?.streak ? <span className="text-sm tabular-nums text-muted">🔥 {t.routine.streak}</span> : null}
-          {t.postponements > 0 && (
+          {look.postponeCounter && t.postponements > 0 && (
             <span
               className={`rounded-md px-1.5 py-0.5 text-xs ${
                 t.postponements >= 3 ? "bg-amber-500/20 text-amber-300" : "bg-hover text-muted"
@@ -233,10 +263,15 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
 
   return (
     <>
-      {total > 0 && <Progress done={doneCount} total={total} />}
-      <ul className="flex flex-col">
+      {chispa ? (
+        <Chispa line={line.line} lineKey={line.key} glow={doneCount} stars={starCount} />
+      ) : (
+        total > 0 && <Progress done={doneCount} total={total} />
+      )}
+      <ul className="flex flex-col claro:gap-2">
         {pending.map(row)}
-        {finished.length > 0 && (
+        {!look.collapseDone && finished.map(row)}
+        {look.collapseDone && finished.length > 0 && (
           <li>
             <button
               type="button"
@@ -249,13 +284,13 @@ export function TaskList({ tasks, day, now, trackOverdue }: { tasks: ListTask[];
             </button>
           </li>
         )}
-        {showDone && finished.map(row)}
+        {look.collapseDone && showDone && finished.map(row)}
       </ul>
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-30 flex justify-center px-5">
           <div key={toast.key} role="status" className="glass row-in pointer-events-auto flex items-center gap-4 rounded-full py-2 pl-5 pr-2 text-sm">
             {toast.message}
-            <button onClick={toast.undo} className="rounded-full bg-white/10 px-3 py-1.5 font-medium transition-transform active:scale-95">
+            <button onClick={toast.undo} className="rounded-full bg-selected px-3 py-1.5 font-medium transition-transform active:scale-95">
               Deshacer
             </button>
           </div>
@@ -282,7 +317,7 @@ function Check({ done, burst, onToggle }: { done: boolean; burst: boolean; onTog
       type="button"
       onClick={onToggle}
       aria-label={done ? "Marcar pendiente" : "Marcar completada"}
-      className={`check relative flex size-6 shrink-0 items-center justify-center rounded-md border transition-[background-color,border-color,transform] duration-200 active:scale-90 ${
+      className={`check relative flex size-6 shrink-0 items-center justify-center rounded-md border claro:size-7 claro:rounded-full claro:border-2 transition-[background-color,border-color,transform] duration-200 active:scale-90 ${
         done ? "check-done border-accent bg-accent" : "border-line-strong hover:border-accent"
       }`}
     >

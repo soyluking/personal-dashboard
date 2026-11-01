@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { addDays, formatDay, formatDayShort, nowTime, todayISO } from "@/lib/dates";
+import { experienceOf, STARS_PER_DONE, visibleStreak } from "@/lib/experiences";
 import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
 import { missedLast, occurrencesOn, resolved, streak } from "@/lib/routine";
@@ -29,28 +30,34 @@ export default function HoyPage({ searchParams }: Props) {
 }
 
 async function Hoy({ searchParams }: Props) {
-  await verifySession();
+  const user = await verifySession();
+  const exp = experienceOf(user);
   // La hora actual solo se puede leer en la solicitud, no al prerenderizar.
   await connection();
   const { fecha } = await searchParams;
   const today = todayISO();
   const day = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : today;
 
-  await rollOverOverdue(today);
+  await rollOverOverdue(user.id, today);
 
-  const [taskRows, routineData] = await Promise.all([
+  const [taskRows, routineData, [{ doneTasks }]] = await Promise.all([
     db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.date, day), ne(tasks.status, "descartada")))
+      .where(and(eq(tasks.userId, user.id), eq(tasks.date, day), ne(tasks.status, "descartada")))
       .orderBy(sql`${tasks.time} asc nulls last`, asc(tasks.id)),
-    loadRoutines(),
+    loadRoutines(user.id),
+    exp.reward === "chispa"
+      ? db.select({ doneTasks: count() }).from(tasks).where(and(eq(tasks.userId, user.id), eq(tasks.status, "hecha")))
+      : [{ doneTasks: 0 }],
   ]);
+  // Las estrellas son todo lo hecho desde siempre: solo suben.
+  const stars = STARS_PER_DONE * (doneTasks + routineData.reduce((sum, r) => sum + r.done.size, 0));
 
   const nextLabel = day === today ? "Pasar a mañana" : "Pasar al día siguiente";
   const taskItems: ListTask[] = taskRows.map((t) => {
     const done = t.status === "hecha";
-    const mustDecide = !done && t.postponements >= DECISION_THRESHOLD;
+    const mustDecide = exp.postponeCounter && !done && t.postponements >= DECISION_THRESHOLD;
     return {
       key: `t${t.id}`,
       id: t.id,
@@ -58,7 +65,7 @@ async function Hoy({ searchParams }: Props) {
       time: t.time,
       done,
       postponements: t.postponements,
-      menu: mustDecide ? <Decision id={t.id} /> : <TaskMenu id={t.id} nextLabel={nextLabel} />,
+      menu: mustDecide ? <Decision id={t.id} /> : <TaskMenu id={t.id} nextLabel={nextLabel} inbox={exp.areasAndInbox} />,
     };
   });
 
@@ -76,15 +83,20 @@ async function Hoy({ searchParams }: Props) {
         menu: <OccurrenceMenu routineId={r.id} date={o.date} />,
         routine: {
           date: o.date,
-          streak: r.trackStreak ? streak(history) : null,
-          warn: day === today && missedLast(history),
+          streak: r.trackStreak ? visibleStreak(streak(history), exp.streak) : null,
+          warn: exp.streak === "completa" && day === today && missedLast(history),
         },
       };
     }),
   );
 
-  // Por hora y lo sin hora al final; a igual hora, la rutina primero.
-  const items = [...routineItems, ...taskItems].sort((a, b) => (a.time ?? "99").localeCompare(b.time ?? "99"));
+  // Por hora; a igual hora, la rutina primero. Lo sin hora va al final o, si lo nuevo entra arriba,
+  // al principio con lo último anotado primero, sobre la rutina sin hora.
+  const untimed = exp.newOnTop ? "00" : "99";
+  const merged = exp.newOnTop ? [...taskItems.toReversed(), ...routineItems] : [...routineItems, ...taskItems];
+  const items = merged.sort((a, b) =>
+    (a.time ?? untimed).localeCompare(b.time ?? untimed),
+  );
 
   const link = (iso: string) => (iso === today ? "/" : `/?fecha=${iso}`);
 
@@ -112,7 +124,7 @@ async function Hoy({ searchParams }: Props) {
       </TopBar>
       <main className="mx-auto w-full max-w-3xl flex-1 px-3 pb-6 pt-4 sm:px-6">
 
-        {items.length === 0 ? (
+        {items.length === 0 && exp.reward !== "chispa" ? (
           <p className="py-16 text-center text-muted">Nada para este día.</p>
         ) : (
           <TaskList
@@ -120,6 +132,9 @@ async function Hoy({ searchParams }: Props) {
             now={nowTime()}
             trackOverdue={day === today}
             tasks={items}
+            look={exp}
+            stars={stars}
+            name={user.name}
           />
         )}
       </main>
@@ -132,7 +147,7 @@ async function Hoy({ searchParams }: Props) {
 const menuItem = "w-full rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-hover active:bg-line";
 
 // Acciones de una tarea, con nombre escrito para no adivinar íconos.
-function TaskMenu({ id, nextLabel }: { id: number; nextLabel: string }) {
+function TaskMenu({ id, nextLabel, inbox }: { id: number; nextLabel: string; inbox: boolean }) {
   return (
     <Menu label="Más acciones">
       <form action={postponeTask}>
@@ -144,10 +159,12 @@ function TaskMenu({ id, nextLabel }: { id: number; nextLabel: string }) {
         <input type="date" name="date" required aria-label="Nueva fecha" className="min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-1 text-xs" />
         <button className="rounded-md px-2 py-1 text-sm hover:bg-hover">Mover</button>
       </form>
-      <form action={scheduleTask}>
-        <input type="hidden" name="id" value={id} />
-        <button className={menuItem}>Mandar a la bandeja</button>
-      </form>
+      {inbox && (
+        <form action={scheduleTask}>
+          <input type="hidden" name="id" value={id} />
+          <button className={menuItem}>Mandar a la bandeja</button>
+        </form>
+      )}
       <form action={discardTask}>
         <input type="hidden" name="id" value={id} />
         <button className={`${menuItem} text-muted`}>Descartar</button>

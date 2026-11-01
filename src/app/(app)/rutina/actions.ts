@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { areaEnum, routineExceptions, routineLogs, routines, routineSlots } from "@/db/schema";
 import { todayISO } from "@/lib/dates";
 import { replaceSlotsFrom, slotsOverlap, type Slot } from "@/lib/routine";
+import { ownsRoutine } from "@/lib/routines";
 import { verifySession } from "@/lib/session";
 
 type Area = (typeof areaEnum.enumValues)[number];
@@ -49,9 +50,10 @@ const same = (a: SlotInput[], b: SlotInput[]) => {
 // Desde la pantalla Rutina vale «todos»: nombre, área y racha cambian en toda la historia;
 // hora y días, desde hoy (el pasado no se reescribe).
 export async function saveRoutine(_: FormState, formData: FormData): Promise<FormState> {
-  await verifySession();
+  const user = await verifySession();
   const today = todayISO();
   const id = Number(formData.get("id")) || null;
+  if (id && !(await ownsRoutine(user.id, id))) return { error: "Esa rutina no existe." };
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Ponle un nombre." };
   const area = String(formData.get("area") ?? "");
@@ -65,7 +67,7 @@ export async function saveRoutine(_: FormState, formData: FormData): Promise<For
 
   await db.transaction(async (tx) => {
     if (!id) {
-      const [r] = await tx.insert(routines).values(values).returning({ id: routines.id });
+      const [r] = await tx.insert(routines).values({ ...values, userId: user.id }).returning({ id: routines.id });
       await tx.insert(routineSlots).values(slots.map((s) => ({ ...s, routineId: r.id, validFrom: today })));
       return;
     }
@@ -85,8 +87,9 @@ export async function saveRoutine(_: FormState, formData: FormData): Promise<For
 
 // Archivar cierra los horarios desde hoy: el pasado y sus rachas quedan.
 export async function archiveRoutine(formData: FormData) {
-  await verifySession();
+  const user = await verifySession();
   const id = Number(formData.get("id"));
+  if (!(await ownsRoutine(user.id, id))) return;
   const today = todayISO();
   await db.transaction(async (tx) => {
     const current = (await tx.select().from(routineSlots).where(eq(routineSlots.routineId, id))).filter(
@@ -101,17 +104,18 @@ export async function archiveRoutine(formData: FormData) {
   redirect("/rutina");
 }
 
-function occurrenceKey(formData: FormData) {
+// Valida la ocurrencia y que la rutina sea del usuario de la sesión.
+async function occurrenceKey(formData: FormData) {
+  const user = await verifySession();
   const routineId = Number(formData.get("routineId"));
   const date = String(formData.get("date") ?? "");
-  if (!routineId || !ISO.test(date)) throw new Error("Ocurrencia inválida");
+  if (!routineId || !ISO.test(date) || !(await ownsRoutine(user.id, routineId))) throw new Error("Ocurrencia inválida");
   return { routineId, date };
 }
 
 // `date` es siempre la fecha original de la ocurrencia.
 export async function setRoutineDone(formData: FormData) {
-  await verifySession();
-  const key = occurrenceKey(formData);
+  const key = await occurrenceKey(formData);
   if (formData.get("done") === "true") await db.insert(routineLogs).values(key).onConflictDoNothing();
   else await db.delete(routineLogs).where(and(eq(routineLogs.routineId, key.routineId), eq(routineLogs.date, key.date)));
   revalidate();
@@ -119,8 +123,7 @@ export async function setRoutineDone(formData: FormData) {
 
 // Solo este día: saltar, otra hora o moverla. No toca el horario.
 export async function changeOccurrence(formData: FormData) {
-  await verifySession();
-  const key = occurrenceKey(formData);
+  const key = await occurrenceKey(formData);
   const kind = formData.get("kind") === "saltar" ? "saltar" : "cambiar";
   const newDate = String(formData.get("newDate") ?? "");
   const exception = {
@@ -138,8 +141,7 @@ export async function changeOccurrence(formData: FormData) {
 
 // Deshacer una excepción: la ocurrencia vuelve a su horario.
 export async function restoreOccurrence(formData: FormData) {
-  await verifySession();
-  const key = occurrenceKey(formData);
+  const key = await occurrenceKey(formData);
   await db
     .delete(routineExceptions)
     .where(and(eq(routineExceptions.routineId, key.routineId), eq(routineExceptions.date, key.date)));

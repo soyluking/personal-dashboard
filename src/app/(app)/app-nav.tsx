@@ -2,12 +2,18 @@
 
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { logout } from "./actions";
+import { logout, setExperience } from "./actions";
 import { Icon, closeIcon, logoutIcon, menuIcon } from "./nav-icons";
 import { setMenuOpen, useMenuOpen } from "./nav-store";
 import { PressLink } from "./press-link";
 
-type Props = { inbox: number };
+type Props = {
+  inbox: number;
+  showInbox: boolean;
+  // La del usuario; null mientras carga.
+  experience: string | null;
+  experiences: { value: string; label: string }[];
+};
 
 const SECTIONS = [
   {
@@ -45,7 +51,7 @@ const SECTIONS = [
 ] as const;
 
 // Como Gemini: en el computador, barra lateral colapsable; en el celular, menú lateral a pantalla completa.
-export function AppNav({ inbox }: Props) {
+export function AppNav({ inbox, showInbox, experience, experiences }: Props) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const open = useMenuOpen();
@@ -53,7 +59,7 @@ export function AppNav({ inbox }: Props) {
   const count = (href: string) => (href === "/bandeja" && inbox > 0 ? inbox : null);
 
   const links = (compact: boolean, onNavigate?: () => void) =>
-    SECTIONS.map(({ href, label, icon }) => {
+    SECTIONS.filter(({ href }) => showInbox || href !== "/bandeja").map(({ href, label, icon }) => {
       const active = href === "/" ? pathname === href : pathname.startsWith(href);
       return (
         <PressLink
@@ -62,7 +68,7 @@ export function AppNav({ inbox }: Props) {
           onClick={onNavigate}
           title={compact ? label : undefined}
           className={`flex h-12 items-center gap-4 rounded-full px-3 text-base transition-colors ${
-            active ? "bg-white/10 font-medium text-foreground" : "text-muted hover:bg-hover hover:text-foreground has-data-[pending=true]:bg-white/10 has-data-[pending=true]:text-foreground"
+            active ? "bg-selected font-medium text-foreground" : "text-muted hover:bg-hover hover:text-foreground has-data-[pending=true]:bg-selected has-data-[pending=true]:text-foreground"
           }`}
         >
           {icon}
@@ -72,8 +78,31 @@ export function AppNav({ inbox }: Props) {
       );
     });
 
+  // Para ver una experiencia con mis propios datos. Cambia la del usuario en todos sus dispositivos.
+  const experiencePicker = (compact: boolean) =>
+    experience && !compact ? (
+      <form action={setExperience} className="mt-auto flex flex-col gap-2 px-3 pb-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted">Experiencia</span>
+        <div className="flex gap-1 rounded-full bg-hover p-1">
+          {experiences.map((e) => (
+            <button
+              key={e.value}
+              name="experience"
+              value={e.value}
+              aria-pressed={e.value === experience}
+              className={`flex-1 rounded-full px-3 py-1.5 text-sm transition-colors ${
+                e.value === experience ? "bg-selected font-medium text-foreground" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
+      </form>
+    ) : null;
+
   const logoutButton = (compact: boolean) => (
-    <form action={logout} className="mt-auto">
+    <form action={logout} className={experience && !compact ? "" : "mt-auto"}>
       <button
         title={compact ? "Cerrar sesión" : undefined}
         className="flex h-12 w-full items-center gap-4 rounded-full px-3 text-base text-muted transition-colors hover:bg-hover hover:text-foreground"
@@ -99,6 +128,7 @@ export function AppNav({ inbox }: Props) {
           {menuIcon}
         </button>
         {links(collapsed)}
+        {experiencePicker(collapsed)}
         {logoutButton(collapsed)}
       </aside>
 
@@ -111,11 +141,12 @@ export function AppNav({ inbox }: Props) {
       >
         <div className="mb-4 flex items-center justify-between pl-3">
           <span className="text-2xl font-medium">Dashboard</span>
-          <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="flex size-12 items-center justify-center rounded-full bg-white/10 transition-transform active:scale-90">
+          <button onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" className="flex size-12 items-center justify-center rounded-full bg-selected transition-transform active:scale-90">
             {closeIcon}
           </button>
         </div>
         {links(false, () => setMenuOpen(false))}
+        {experiencePicker(false)}
         {logoutButton(false)}
       </div>
     </>

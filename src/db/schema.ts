@@ -39,10 +39,31 @@ export const routineExceptionKindEnum = pgEnum("routine_exception_kind", [
   "cambiar",
 ]);
 
+// Cómo se ve y se comporta la app para cada usuario. Las reglas de cada una están en src/lib/experiences.ts.
+export const experienceEnum = pgEnum("experience", ["ejecutiva", "juego"]);
+
+// Se crea en el primer ingreso. Los nuevos parten en «juego»: la «ejecutiva» es la del dueño.
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  // Siempre en minúsculas.
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  experience: experienceEnum("experience").notNull().default("juego"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+const owner = () =>
+  integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" });
+
 export const tasks = pgTable(
   "tasks",
   {
     id: serial("id").primaryKey(),
+    userId: owner(),
     text: text("text").notNull(),
     area: areaEnum("area"),
     // Sin fecha = bandeja.
@@ -50,16 +71,19 @@ export const tasks = pgTable(
     time: time("time"),
     status: taskStatusEnum("status").notNull().default("pendiente"),
     postponements: integer("postponements").notNull().default(0),
+    // Cuándo se marcó hecha; null si no lo está. Para medir el piloto y los combos.
+    completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("tasks_date_idx").on(t.date)],
+  (t) => [index("tasks_user_date_idx").on(t.userId, t.date)],
 );
 
 // La identidad de un elemento de rutina. Nombre, área y racha valen para toda su historia.
 export const routines = pgTable("routines", {
   id: serial("id").primaryKey(),
+  userId: owner(),
   name: text("name").notNull(),
   trackStreak: boolean("track_streak").notNull().default(true),
   area: areaEnum("area"),
@@ -131,10 +155,11 @@ export const routineLogs = pgTable(
 export const weeklyNotes = pgTable(
   "weekly_notes",
   {
+    userId: owner(),
     // Lunes de la semana.
     weekStart: date("week_start", { mode: "string" }).notNull(),
     area: areaEnum("area").notNull(),
     score: smallint("score").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.weekStart, t.area] })],
+  (t) => [primaryKey({ columns: [t.userId, t.weekStart, t.area] })],
 );
