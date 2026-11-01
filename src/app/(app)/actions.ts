@@ -62,7 +62,7 @@ export async function reorderTasks(day: string, ids: number[]) {
   const cases = sql.join(ids.map((id, i) => sql`when ${id} then ${i}`), sql` `);
   await db
     .update(tasks)
-    .set({ position: sql`case ${tasks.id} ${cases} end` })
+    .set({ position: sql`(case ${tasks.id} ${cases} end)::integer` })
     .where(and(eq(tasks.userId, user.id), eq(tasks.date, day), inArray(tasks.id, ids)));
   revalidate();
 }
