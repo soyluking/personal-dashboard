@@ -44,7 +44,7 @@ export function TaskText({ id, text, time, done }: Props) {
             e.currentTarget.blur();
           }
         }}
-        className="min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-2 py-0.5 text-base outline-none"
+        className="min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-2 py-0.5 text-base outline-none select-text"
       />
     );
   }

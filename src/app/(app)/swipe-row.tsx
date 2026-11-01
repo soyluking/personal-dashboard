@@ -48,6 +48,8 @@ export function SwipeRow({ enabled, onComplete, actions, children }: Props) {
   const onPointerMove = (e: React.PointerEvent) => {
     const s = start.current;
     if (!s) return;
+    // Si la fila se empezó a arrastrar para reordenar, el swipe se suelta.
+    if (!enabled) return onPointerCancel();
     const ddx = e.clientX - s.x;
     const ddy = e.clientY - s.y;
     if (!s.axis) {

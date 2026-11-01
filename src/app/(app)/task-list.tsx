@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useOptimistic, useRef, useState, useTransition } from "react";
-import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type Modifier } from "@dnd-kit/core";
+import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type Modifier } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { nowTime } from "@/lib/dates";
@@ -31,6 +31,17 @@ export type ListTask = {
 // Lo hecho baja a su sección después de esta pausa: tapar otra tarea con el dedo mientras salta es peor que esperar.
 const SETTLE_MS = 700;
 const COLORS = ["#3f6fe6", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
+// Mientras se edita el texto, mantener presionado mueve el cursor, no la fila.
+const inField = (target: EventTarget | null) => target instanceof Element && target.closest("input, textarea") !== null;
+class RowTouchSensor extends TouchSensor {
+  static activators = [
+    { eventName: "onTouchStart" as const, handler: ({ nativeEvent: e }: React.TouchEvent) => e.touches.length === 1 && !inField(e.target) },
+  ];
+}
+class RowMouseSensor extends MouseSensor {
+  static activators = [{ eventName: "onMouseDown" as const, handler: ({ nativeEvent: e }: React.MouseEvent) => e.button === 0 && !inField(e.target) }];
+}
+
 // Arrastrar solo sube o baja.
 const vertical: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 const dragA11y = {
@@ -125,8 +136,15 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
   // Se reordena a mano solo lo pendiente sin hora: la hora manda y la rutina queda fija.
   const movable = pending.filter((t) => !t.routine && t.time === null && !t.done);
   const movableKeys = movable.map((t) => t.key);
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  // En el celular se toma manteniendo presionado: el toque edita y moverse de inmediato es scroll o swipe.
+  const sensors = useSensors(
+    useSensor(RowTouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(RowMouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const [dragging, setDragging] = useState(false);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    setDragging(false);
     if (!over || active.id === over.id) return;
     const next = arrayMove(movableKeys, movableKeys.indexOf(String(active.id)), movableKeys.indexOf(String(over.id)));
     const ids = next.map((key) => movable.find((t) => t.key === key)!.id);
@@ -244,19 +262,19 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
   const row = (t: ListTask) =>
     movable.length > 1 && movableKeys.includes(t.key) ? (
       <SortableRow key={t.key} id={t.key} rowRef={rowRef(t.key)}>
-        {(handle) => body(t, handle)}
+        {body(t)}
       </SortableRow>
     ) : (
       <li key={t.key} ref={rowRef(t.key)}>
-        {body(t, null)}
+        {body(t)}
       </li>
     );
 
-  const body = (t: ListTask, handle: React.ReactNode) => {
+  const body = (t: ListTask) => {
     const overdue = look.overdueAlert && trackOverdue && !t.done && t.time !== null && t.time.slice(0, 5) < clock;
     return (
         <SwipeRow
-          enabled={!t.done}
+          enabled={!t.done && !dragging}
           onComplete={() => complete(t)}
           actions={
             t.routine
@@ -268,7 +286,7 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
           }
         >
         <div
-          className={`row-in relative flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover claro:rounded-2xl claro:bg-card claro:px-4 claro:py-3 claro:shadow-[0_1px_4px_rgb(43_34_64/0.08)] ${
+          className={`row-in relative flex select-none [-webkit-touch-callout:none] flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-hover claro:rounded-2xl claro:bg-card claro:px-4 claro:py-3 claro:shadow-[0_1px_4px_rgb(43_34_64/0.08)] ${
             overdue ? "bg-red-500/10" : ""
           } ${chispa && burst === t.key ? "pop" : ""}`}
         >
@@ -308,7 +326,6 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
             </span>
           )}
           {!t.done && t.menu}
-          {handle}
         </div>
         </SwipeRow>
     );
@@ -321,7 +338,14 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
       ) : (
         total > 0 && <Progress done={doneCount} total={total} />
       )}
-      <DndContext id="hoy" sensors={sensors} collisionDetection={closestCenter} modifiers={[vertical]} onDragEnd={onDragEnd} accessibility={dragA11y}>
+      <DndContext id="hoy" sensors={sensors} collisionDetection={closestCenter} modifiers={[vertical]} onDragStart={() => {
+          setDragging(true);
+          navigator.vibrate?.(10);
+        }}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => setDragging(false)}
+        accessibility={dragA11y}
+      >
       <SortableContext items={movableKeys} strategy={verticalListSortingStrategy}>
       <ul className="flex flex-col claro:gap-2">
         {pending.map(row)}
@@ -370,36 +394,33 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
 
 type Change = { key: string; done?: boolean; remove?: boolean } | { order: string[] };
 
-// Fila que se arrastra desde su asa. El asa no inicia el swipe de la fila.
-function SortableRow({ id, rowRef, children }: { id: string; rowRef: (el: HTMLLIElement | null) => void; children: (handle: React.ReactNode) => React.ReactNode }) {
-  const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+// Fila que se arrastra completa. Soltarla no cuenta como toque: no abre la edición.
+function SortableRow({ id, rowRef, children }: { id: string; rowRef: (el: HTMLLIElement | null) => void; children: React.ReactNode }) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id });
+  const dragged = useRef(false);
+  useEffect(() => {
+    if (isDragging) dragged.current = true;
+  }, [isDragging]);
   return (
     <li
       ref={(el) => {
         setNodeRef(el);
         rowRef(el);
       }}
+      {...attributes}
+      {...listeners}
+      role={undefined}
+      onPointerDownCapture={() => void (dragged.current = false)}
+      onClickCapture={(e) => {
+        if (!dragged.current) return;
+        e.stopPropagation();
+        e.preventDefault();
+        dragged.current = false;
+      }}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={isDragging ? "relative z-10 rounded-lg bg-surface shadow-lg" : undefined}
+      className={isDragging ? "relative z-10 scale-[1.02] rounded-lg bg-surface shadow-lg" : undefined}
     >
-      {children(
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          {...attributes}
-          {...listeners}
-          onPointerDown={(e) => {
-            listeners?.onPointerDown?.(e);
-            e.stopPropagation();
-          }}
-          aria-label="Reordenar"
-          className="-mr-1 flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted transition-colors hover:bg-hover hover:text-foreground active:cursor-grabbing"
-        >
-          <svg viewBox="0 0 16 16" className="size-4" fill="currentColor" aria-hidden>
-            {[4, 8, 12].flatMap((y) => [6, 10].map((x) => <circle key={`${x}${y}`} cx={x} cy={y} r="1.2" />))}
-          </svg>
-        </button>,
-      )}
+      {children}
     </li>
   );
 }
