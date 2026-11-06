@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import { EXPERIENCES, experienceOf } from "@/lib/experiences";
 import { verifySession } from "@/lib/session";
 import { countInbox } from "@/lib/tasks";
+import { userTimeZone } from "@/lib/time-zone";
 import { AppNav } from "./app-nav";
 import { ThemeSync } from "./theme-sync";
+import { TimeZoneSync } from "./time-zone-sync";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
@@ -22,6 +24,7 @@ async function Nav() {
   return (
     <>
       <ThemeSync theme={experience.theme} />
+      <TimeZoneSync current={await userTimeZone()} />
       <AppNav
         inbox={experience.areasAndInbox ? await countInbox(user.id) : 0}
         showInbox={experience.areasAndInbox}

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { areaEnum } from "@/db/schema";
 import { experienceOf } from "@/lib/experiences";
 import { todayISO } from "@/lib/dates";
+import { userTimeZone } from "@/lib/time-zone";
 import { loadRoutines } from "@/lib/routines";
 import { verifySession } from "@/lib/session";
 import { ListSkeleton } from "../../skeleton";
@@ -25,7 +26,7 @@ async function EditarRutina({ searchParams }: Props) {
   const user = await verifySession();
   await connection();
   const id = Number((await searchParams).id);
-  const today = todayISO();
+  const today = todayISO(await userTimeZone());
   const routine = (await loadRoutines(user.id)).find((r) => r.id === id && r.archivedAt === null);
   if (!routine) notFound();
   // El formulario edita los horarios de hoy en adelante.

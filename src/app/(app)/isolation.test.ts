@@ -14,6 +14,7 @@ vi.mock("@/lib/session", () => ({ verifySession: async () => session.current }))
 vi.mock("@/auth", () => ({ signOut: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("@/lib/time-zone", () => ({ userTimeZone: async () => "America/Santiago" }));
 
 import { eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";

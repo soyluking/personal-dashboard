@@ -1,13 +1,23 @@
-// Fechas como "YYYY-MM-DD" en la zona horaria fija del dashboard.
-const TIME_ZONE = "America/Santiago";
+// Fechas como "YYYY-MM-DD". «Hoy» y «ahora» dependen de la zona horaria del dispositivo,
+// que el servidor conoce por una cookie (ver time-zone.ts); sin ella, la de Santiago.
+export const DEFAULT_TIME_ZONE = "America/Santiago";
 
-export function todayISO(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE }).format(now);
+export function isValidTimeZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-// Hora actual «HH:MM» en la zona del dashboard.
-export function nowTime(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+export function todayISO(timeZone: string = DEFAULT_TIME_ZONE, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone }).format(now);
+}
+
+// Hora actual «HH:MM».
+export function nowTime(timeZone: string = DEFAULT_TIME_ZONE, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
 }
 
 export function addDays(iso: string, days: number): string {

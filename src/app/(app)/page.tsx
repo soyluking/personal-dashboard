@@ -4,6 +4,7 @@ import { and, count, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { addDays, formatDay, formatDayShort, nowTime, todayISO } from "@/lib/dates";
+import { userTimeZone } from "@/lib/time-zone";
 import { experienceOf, STARS_PER_DONE, visibleStreak } from "@/lib/experiences";
 import { verifySession } from "@/lib/session";
 import { DECISION_THRESHOLD, rollOverOverdue } from "@/lib/tasks";
@@ -36,7 +37,8 @@ async function Hoy({ searchParams }: Props) {
   // La hora actual solo se puede leer en la solicitud, no al prerenderizar.
   await connection();
   const { fecha } = await searchParams;
-  const today = todayISO();
+  const timeZone = await userTimeZone();
+  const today = todayISO(timeZone);
   const day = fecha && /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : today;
 
   await rollOverOverdue(user.id, today);
@@ -130,7 +132,7 @@ async function Hoy({ searchParams }: Props) {
         ) : (
           <TaskList
             day={day}
-            now={nowTime()}
+            now={nowTime(timeZone)}
             trackOverdue={day === today}
             tasks={items}
             look={exp}

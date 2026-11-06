@@ -6,6 +6,7 @@ import { signOut } from "@/auth";
 import { db } from "@/db";
 import { experienceEnum, tasks, users } from "@/db/schema";
 import { todayISO } from "@/lib/dates";
+import { userTimeZone } from "@/lib/time-zone";
 import { parseCapture, parseEdit } from "@/lib/parse-capture";
 import { verifySession } from "@/lib/session";
 import { ownTask } from "@/lib/tasks";
@@ -25,7 +26,7 @@ export async function captureTask(formData: FormData) {
   if (!input) return;
 
   const day = String(formData.get("day") ?? "");
-  const { text, date, time } = parseCapture(input, todayISO(), /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null);
+  const { text, date, time } = parseCapture(input, todayISO(await userTimeZone()), /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null);
   await db.insert(tasks).values({ userId: user.id, text, date, time });
   revalidate();
 }
@@ -37,7 +38,7 @@ export async function editTask(id: number, input: string) {
   const [task] = await db.select({ date: tasks.date }).from(tasks).where(ownTask(user.id, id));
   if (!task) return;
 
-  const { text, date, time } = parseEdit(input, task.date, todayISO());
+  const { text, date, time } = parseEdit(input, task.date, todayISO(await userTimeZone()));
   await db
     .update(tasks)
     .set({ text, date, time, ...(date !== task.date && { postponements: 0, position: null }) })

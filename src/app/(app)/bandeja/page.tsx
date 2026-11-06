@@ -4,6 +4,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { areaEnum, tasks } from "@/db/schema";
 import { addDays, todayISO } from "@/lib/dates";
+import { userTimeZone } from "@/lib/time-zone";
 import { redirect } from "next/navigation";
 import { experienceOf } from "@/lib/experiences";
 import { verifySession } from "@/lib/session";
@@ -33,7 +34,7 @@ async function Bandeja({ searchParams }: Props) {
   if (!experienceOf(user).areasAndInbox) redirect("/");
   await connection();
   const { area } = await searchParams;
-  const today = todayISO();
+  const today = todayISO(await userTimeZone());
 
   const filter =
     area === NO_AREA

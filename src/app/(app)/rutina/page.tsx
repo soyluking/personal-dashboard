@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { todayISO } from "@/lib/dates";
+import { userTimeZone } from "@/lib/time-zone";
 import { describeSlot, resolved, streak } from "@/lib/routine";
 import { loadRoutines } from "@/lib/routines";
 import { verifySession } from "@/lib/session";
@@ -21,7 +22,7 @@ export default function RutinaPage() {
 async function Rutina() {
   const user = await verifySession();
   await connection();
-  const today = todayISO();
+  const today = todayISO(await userTimeZone());
 
   const items = (await loadRoutines(user.id))
     .filter((r) => r.archivedAt === null)

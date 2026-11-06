@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { areaEnum, routineExceptions, routineLogs, routines, routineSlots } from "@/db/schema";
 import { todayISO } from "@/lib/dates";
+import { userTimeZone } from "@/lib/time-zone";
 import { replaceSlotsFrom, slotsOverlap, type Slot } from "@/lib/routine";
 import { ownsRoutine } from "@/lib/routines";
 import { verifySession } from "@/lib/session";
@@ -51,7 +52,7 @@ const same = (a: SlotInput[], b: SlotInput[]) => {
 // hora y días, desde hoy (el pasado no se reescribe).
 export async function saveRoutine(_: FormState, formData: FormData): Promise<FormState> {
   const user = await verifySession();
-  const today = todayISO();
+  const today = todayISO(await userTimeZone());
   const id = Number(formData.get("id")) || null;
   if (id && !(await ownsRoutine(user.id, id))) return { error: "Esa rutina no existe." };
   const name = String(formData.get("name") ?? "").trim();
@@ -90,7 +91,7 @@ export async function archiveRoutine(formData: FormData) {
   const user = await verifySession();
   const id = Number(formData.get("id"));
   if (!(await ownsRoutine(user.id, id))) return;
-  const today = todayISO();
+  const today = todayISO(await userTimeZone());
   await db.transaction(async (tx) => {
     const current = (await tx.select().from(routineSlots).where(eq(routineSlots.routineId, id))).filter(
       (s) => s.validTo === null || s.validTo >= today,

@@ -76,7 +76,7 @@ export function TaskList({ tasks, day, now, trackOverdue, look, stars, name }: P
   const [clock, setClock] = useState(now);
   useEffect(() => {
     if (!trackOverdue) return;
-    const tick = () => setClock(nowTime());
+    const tick = () => setClock(nowTime(Intl.DateTimeFormat().resolvedOptions().timeZone));
     tick();
     const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
